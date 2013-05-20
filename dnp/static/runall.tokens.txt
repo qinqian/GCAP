@@ -1,0 +1,78 @@
+[script-tokenizer]
+
+#######################################
+## Notes:  If duplicate token definitions exist, the last definition in
+##         the file will be used. Tokens can use .ini variables and declarations.
+##         See http://docs.python.org/library/configparser.html
+#######################################
+
+#######################################
+# Global tokens (used by most scripts)
+#######################################
+
+## Tags file in bam format (file extension .bam), or starched bed file
+## (file extension .bed.starch).  If the latter, file should be in the
+## location specified by _OUTDIR_.  If the former, the bed.starch file
+## will be genereated, and put in _OUTDIR_.
+_TAGS_: /home/rthurman/proj/hotspot-distr-v3/data/NHDF_Ad.DNase_seq.hg19.bam
+
+## Genome 
+_GENOME_ = hg19
+## Tag length
+_K_ = 36
+## Chromosome coordinates, bed format.
+_CHROM_FILE_ = /home/rthurman/proj/hotspot-distr-v3/data/hg19.chromInfo.bed
+## Location of uniquely mappable positions in the genome for this tag length.
+_MAPPABLE_FILE_ = /home/rthurman/proj/hotspot-distr-v3/data/hg19.K36.mappable_only.bed
+
+## Set DUPOK to T for DNaseI data, F for ChIP-seq data (DUPOK = T means allow duplicate reads)
+_DUPOK_ = T
+
+## FDR levels. Set to N if you do not want FDR thresholding (for
+## example, if you just want SPOT score computed.)
+## _FDRS_ = "N"
+_FDRS_ = "0.01"
+
+## Tag density, 150bp window, sliding every 20bp, used for
+## peak-finding.  Will be generated, based on the _TAGS_ file, if it
+## does not exist. Assumed to be starched bed file, extension
+## bed.starch.  Can also be a directory, in which case the density file
+## name will be assumed to be the name of the tags file, minus the bam
+## or bed.starch extension, with the added extension
+## tagdensity.bed.starch.
+_DENS_: /home/rthurman/proj/hotspot-distr-v3/pipeline-scripts/test
+
+## Output directories (can all be the same location).  Use full path names.
+## _OUTDIR_ contains tags files in converted bed.starch and lib.txt formats (for hotspot
+## program), and hotspot and peak results.
+## _RANDIR_ contains generated random tags (for FDR thresholding) and hotspots called on random tags.
+_OUTDIR_ = /home/rthurman/proj/hotspot-distr-v3/pipeline-scripts/test
+_RANDIR_ = /home/rthurman/proj/hotspot-distr-v3/pipeline-scripts/test
+
+## Set to T if you want scripts to skip steps that have already been done.
+_CHECK_ = T
+## If _CHECK_ = T, outputs are checked for completeness by searching
+## for results for the following chromsome.
+_CHKCHR_ = chrX
+
+## Hotspot program binary
+_HOTSPOT_ = hotspot5
+
+## Peak-finding program.
+_PKFIND_BIN_ = wavePeaks
+## Peak-finding smoothing level. If the resolution of the input file
+## is x, then the results are smoothed out to a scale of (2^level)*x.
+_PKFIND_SMTH_LVL_ = 3
+
+## Random number seed, used for generating random tags for FDR thresholding.
+_SEED_=101
+
+## Hotspot program parameters
+_THRESH_ = 2
+_WIN_MIN_ = 200
+_WIN_MAX_ = 300
+_WIN_INCR_ = 50
+_BACKGRD_WIN_ = 50000
+_MERGE_DIST_ = 150
+_MINSIZE_ = 10
+

@@ -1,0 +1,69 @@
+#! /bin/bash
+
+# Run first pass of hotspot.
+
+gnom=_GENOME_
+
+# Tags file in bam format (file extension .bam), or starched bed file
+# (file extension .bed.starch).  If the latter, file should be in the
+# location specified by_OUTDIR_.  If the former, the bed.starch file
+# will be genereated, and put in _OUTDIR_.
+tags=_TAGS_
+
+# Hotspot lib files will be written here.  Hotspot requires a "lib"
+# file, not a bed file. lib file will be created by this script from
+# the original bam file, if necessary, and will go in the following
+# location.  The name of the lib file will be same as the tags file,
+# with extension bed.starch replaced by lib.filter.txt or
+# lib.filter.nodup.txt, the latter being chosen if variable dupok is
+# not "T".
+libd=_OUTDIR_
+
+# Chromosome start, stop positions
+chroms=_CHROM_FILE_
+
+# Duplicate tags OK?  (Set to T if yes - for DNaseI data, for instance; anything else - for ChIP, for instance - means no.)
+dupok=_DUPOK_
+
+check=_CHECK_
+
+thisscr="run_make_lib"
+echo
+echo $thisscr
+
+proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
+tagsb=$libd/$proj.bed.starch
+
+if [ ! -e $tagsb ]; then
+    echo "$thisscr: creating bed file..."
+    samtools view $tags \
+        | awk 'BEGIN{FS="\t"; OFS="\t"}{len=length($10); s=$4-1; if(and(16,$2) == 16) s+=len-1; chr=$3; print chr,s,s+1}' \
+        | sort-bed - \
+	| starch - \
+	> $tagsb
+fi
+if [ $dupok == "T" ]; then
+    lib=$libd/$proj.lib.filter.txt
+else
+    lib=$libd/$proj.lib.filter.nodup.txt
+fi
+if [ $check == "T" ] && [ -f $lib ] && [ -s $lib ]; then
+    echo "$thisscr: $lib exists; skipping"
+    exit 0
+fi
+
+echo "$thisscr: creating lib file..."
+if [ $dupok == "T" ]; then
+    unstarch $tagsb \
+        | bedops -e -1 - $chroms \
+        | awk '{print $1, $2}' - \
+        | tee $lib \
+        | wc -l > $lib.counts
+else
+    unstarch $tagsb \
+        | bedops -e -1 - $chroms \
+        | awk '{print $1, $2}' - \
+        | uniq - \
+        | tee $lib \
+        | wc -l > $lib.counts
+fi
