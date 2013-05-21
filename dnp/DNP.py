@@ -541,11 +541,12 @@ def _hotspot_combo(workflow, conf):
     ## all reads combo
     attach_back(workflow,
         ShellCommand(
-            "{tool} {param[tag_list]} {output}",
+            "{tool} {param[tag_list]} > {param[tmp]} && unstarch {param[tmp]} | sort-bed - | starch - > {output}",
             tool = "starchcat",
             input = [ target + ".bed.starch" for target in conf.treatment_targets ],
             output = conf.prefix + "_merge_all.bed.starch",
-            param = {"tag_list": " ".join([ target + ".bed.starch" for target in conf.treatment_targets ])}))
+            param = {"tag_list": " ".join([ target + ".bed.starch" for target in conf.treatment_targets ]),
+                     "tmp": conf.prefix + "_merge_all.bed.starch.tmp"}))
 
     ## config for hotspot 3
     hotspot_conf = attach_back(workflow,
@@ -574,11 +575,11 @@ def _hotspot_combo(workflow, conf):
     ## 5M read combo
     starch_cat = attach_back(workflow,
                     ShellCommand(
-                        "{tool} {param[tag_list]} {output}",
+                        "{tool} {param[tag_list]} > {param[tmp]} && unstarch {param[tmp]} | sort-bed - | starch - > {output}",
                         tool = "starchcat",
                         input = [ target + "_5M.bed.starch" for target in conf.treatment_targets ],
                         output = conf.prefix + "_merge_5M.bed.starch",
-                        param = {}))
+                        param = {"tmp": conf.prefix + "_merge_all.bed.starch.tmp"}))
     starch_cat.param["tag_list"] = " ".join(starch_cat.input)
 
     ## config for hotspot 3
