@@ -10,13 +10,12 @@ from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 from pkg_resources import resource_filename
 
-from dnp.config import Conf
-from dnp.helpers import *
+from gcap.config import Conf
+from gcap.helpers import *
 
-latex_template = resource_filename("dnp", "static/Latex_summary_report.jinja2")
 ## hotspot
-token_file = resource_filename("dnp", "static/runall.tokens.txt")
-pipeline_scripts = resource_filename("dnp", "pipeline-scripts")
+token_file = resource_filename("gcap", "static/runall.tokens.txt")
+pipeline_scripts = resource_filename("gcap", "pipeline-scripts")
 
 
 class FriendlyArgumentParser(argparse.ArgumentParser):
@@ -29,18 +28,18 @@ def parse_args(args=None):
     """
     If args is None, argparse will parse from sys.argv
     """
-    description = "DNP :  DNase I Seq pipeline"
+    description = "GCAP :  Global Chromatin Accessibility Pipeline"
     parser = FriendlyArgumentParser(description=description)
     sub_parsers = parser.add_subparsers(help="sub-command help", dest="sub_command")
 
     parser_run = sub_parsers.add_parser("run", help="run pipeline using a config file",
-        description="DNP-run: Run DNP pipeline using a config file")
+        description="GCAP-run: Run GCAP pipeline using a config file")
 
     parser_batch = sub_parsers.add_parser("batch", help="run pipeline for multiple datasets")
     parser_batch.add_argument("-b", "--batch-config", dest="batch_config", required=True, help="batch file")
     parser_purge = sub_parsers.add_parser("purge")
     parser_clean = sub_parsers.add_parser("clean", help="Move result file into a new folder and delete other files",
-        description="DNP-run: Run DNP pipeline using a config file")
+        description="GCAP-run: Run GCAP pipeline using a config file")
 
     for p in (parser_run, parser_batch):
         p.add_argument("--from", dest="start_step", default=0, type=int,
@@ -450,21 +449,38 @@ def _hotspot_on_replicates(workflow, conf):
         output = {"json": conf.json_prefix + "_sample_spot_5M.json"}, ## try density plot
         param = None))
 
+
+    ## evaluate replicates total peaks for 5M and all reads
+
+
 def _hotspot_reps_preprocessing(workflow, conf):
     """
     remove blacklist and outlier
     """
+    has_velcro = conf.get("lib", "velcro")  ## mouse not have blacklist yet
     for i, target in enumerate(conf.treatment_targets):
-        ## remove blacklist
-        attach_back(workflow,
-            ShellCommand(
-                "{tool} -v -a {input[peaks]} -b {input[velcro_peaks_bed]} > {output}",
-                tool="intersectBed",
-                input={"peaks": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
+        ## remove blacklist for human
+        ## mouse no blacklist ??
+        if has_velcro:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} -v -a {input[peaks]} -b {input[velcro_peaks_bed]} > {output}",
+                    tool="intersectBed",
+                    input={"peaks": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
                        "velcro_peaks_bed": conf.get("lib", "velcro")},
-                output = target + "_5M_velcro_non_overlap_peaks.bed",
-                name = "filter blacklist",
-                param=None))
+                    output = target + "_5M_velcro_non_overlap_peaks.bed",
+                    name = "filter blacklist",
+                    param=None))
+        else: ## for mouse, just rename to *_5M_velcro_non_overlap_peaks.bed
+            attach_back(workflow,
+                ShellCommand(
+                    "cp {input[peaks]} {output}",
+                    tool="cp",
+                    input={"peaks": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed"},
+                    output = target + "_5M_velcro_non_overlap_peaks.bed",
+                    name = "No blacklist, not filter blacklist",
+                    param=None))
+
         ## awk and bedClip to remove outlier location from above input
         attach_back(workflow,
             ShellCommand(
@@ -486,7 +502,6 @@ def _hotspot_reps_preprocessing(workflow, conf):
 
 def _hotspot_reps_evaluation(workflow, conf):
     ## use 5M reads to evaluate
-    ## preprocessing
 
     ## intersect region ratio in pairwise ways
     for i in range(len(conf.treatment_targets)):
@@ -605,6 +620,10 @@ def _hotspot_combo(workflow, conf):
                   "density_starch": conf.prefix + "_5M.tagdensity.bed.starch",
                   "spot": conf.prefix + "_5M.spot.out"},
         param = None))
+
+    ## evaluate combo total peaks number for 5M and all reads
+
+
 
 def _promoter_overlap(workflow, conf):
     """ use bedtools to get promotor peaks enrichment
@@ -739,7 +758,7 @@ def prepare_purge(workflow, conf):
 
 def create_workflow(args, conf):
     workflow = Workflow(name="Main")
-    bld = DNPBuilder(workflow, conf)
+    bld = GCAPBuilder(workflow, conf)
 
     if args.sub_command == "clean":
         ## not implemented yet
@@ -759,7 +778,6 @@ def create_workflow(args, conf):
 
     have_treat_reps = len(conf.treatment_pairs) >= 2 ## replicates
     has_dhs = conf.get("lib", "dhs")
-    has_velcro = conf.get("lib", "velcro")  ## mouse not have blacklist yet
     need_run = step_checker.need_run
 
     bld.attach_back(ShellCommand(

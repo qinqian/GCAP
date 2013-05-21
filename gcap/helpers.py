@@ -25,7 +25,7 @@ class StepChecker:
             return False
         return True
 
-class DNPBuilder:
+class GCAPBuilder:
     def __init__(self, workflow, conf):
         self.workflow = workflow
         self.conf = conf
@@ -301,8 +301,14 @@ def stat_spot_on_replicates(input = {"spot_files": ""}, output = {"json": "", "R
             spot["stat"][spot_file] = stat_dict
     json_dump(spot)
 
+def stat_peaks_number(input = {"peaks": ""}, output = {}):
+    """ evaluate two passes hotspot and peaks merge regions number """
+    data = open(input["peaks"]).readlines()
+    json_dict = {"input": input, "output": output, "stat": len(data)}
+
 def stat_reps(input={"peaks": ""},
              output={"json": ""}, param=None):
+    ## overlap percentage between replicates
     result_dict = {"stat": {}, "input": input, "output": output, "param": param}
     json_dump(result_dict)
 

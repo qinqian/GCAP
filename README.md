@@ -1,5 +1,5 @@
-## What is DNP
-> ENCODE 3 `DN`ase I seq QC `P`ipeline
+## What is GCAP
+> `G`lobal `C`hromatin `A`ccessibility `P`ipeline
 
 Install 
 =============
@@ -53,13 +53,15 @@ install bedops and bedtools
 install picard
 --------------------
 Use picard for SortSam, Markduplicates for both single end and pair end data.
-Use picard for pair end data `fragment size` evaluation.
+Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
 For single end data, we used MACS2 predictd
 
 ----
 
-install cistrome-application
-----------------------------
+Built-in modules
+-------------------
+For this part, install cistrome-application temporarily. This will be replaced by `Bedtools` and `built-in modules from cistrome-application`.
+
 Use `mercurial` to get necessary packages:
 
     hg clone https://bitbucket.org/cistrome/cistrome-applications-harvard
@@ -70,9 +72,9 @@ install each of the packages contained in `cistrome-applications-harvard` repo
 * use the lastest repo
 
 
-install latex
+Install latex
 ---------------
-check whether `pdflatex` is executive or not.
+Check whether `pdflatex` is executable or not.
 
 - - - -
 
@@ -80,7 +82,7 @@ check whether `pdflatex` is executive or not.
 Usage
 =============
 
-refer to static/DNP_pe.conf for pair end data, static/DNP_se.conf for single end data.
+refer to static/GCAP_pe.conf for pair end data, static/GCAP_se.conf for single end data.
 
 If input is single end data, use `,` to separate replicates files.
 If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
@@ -103,27 +105,27 @@ for human should be the data contained in the static/hg19.refgene.tss, which is 
 
 only print command line: 
 
-	DNP.py run -c DNP_se.conf
+	GCAP.py run -c GCAP_se.conf
 
 * real run
 
 run with real data: 
 
-	DNP.py run -c DNP_pe.conf
+	GCAP.py run -c GCAP_pe.conf
 
 * resume
 
 resume process when problems occurs:
 
-	DNP.py run -c DNP_pe.conf --resume
+	GCAP.py run -c GCAP_pe.conf --resume
 
 
 * skip steps
-DNP.py run -c DNP_pe.conf --skip 9 --resume
+GCAP.py run -c GCAP_pe.conf --skip 9 --resume
 
 * from and to
 
-DNP.py run -c DNP_pe.conf --from 1 --to 3 --resume
+GCAP.py run -c GCAP_pe.conf --from 1 --to 3 --resume
 
 ----
 
@@ -139,6 +141,7 @@ Prototype  Features
 4. estimates SPOT score for 5M reads
 
 5. estimate replicates consistency by using 5M sampled data union peaks by bigwiggle and by peaks regions overlap
+
 6. calculate peaks promotor percentage and compare with genome promotor percentage for 5M reads
 
 7. calculate Phastcon score of top 1000 non-promotor peaks regions in 100 bp width around summits for 5M reads
@@ -154,17 +157,6 @@ Install MACS2 for optional peaks caller:
 	or 
 	pip install MACS2
 	
-Install bwa for optional reads mapping tool
-
-
-TODO
-=====================
-Following features has been tested in single end data for single replicates successfully.
-For replicates and pair-end mode, the program is still under test.
-
-1. Add bwa for reads mapping optionally
-2. Add macs2 for peaks calling optionally
-3. add a jinja2 template for QC summary latex report rendering, e.g. for pair end, 
-4. test on more data and situations, like pair end data with replicates.
+Install bwa for optional reads mapping tool.
 
 ![QC report](example.png)

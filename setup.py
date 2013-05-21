@@ -1,15 +1,15 @@
 from distutils.core import setup
 
 setup(
-    name='DNP',
+    name='GCAP',
     version='0.1',
-    packages=['dnp'],
+    packages=['gcap'],
     url='',
     license='MIT',
     author='Qian Qin',
     author_email='qinqianhappy@gmail.com',
     description='DNase I seq QC pipeline',
-    scripts = ["dnp/DNP.py", "dnp/pipeline-scripts/tags.sh", "dnp/pipeline-scripts/script-tokenizer.py", "dnp/pipeline-scripts/runhotspot"],
+    scripts = ["gcap/GCAP", "gcap/pipeline-scripts/tags.sh", "gcap/pipeline-scripts/script-tokenizer.py", "gcap/pipeline-scripts/runhotspot"],
     requires=["samflow", "jinja2", "argparse"],
-    package_data = {"dnp" : ["static/*", "pipeline-scripts/*"]}
+    package_data = {"gcap" : ["static/*", "pipeline-scripts/*"]}
 )
