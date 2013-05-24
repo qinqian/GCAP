@@ -65,11 +65,8 @@ class Conf(object):
 
     @property
     def hotspot_merge_both_passes_prefix(self):
-        return os.path.join(self.prefix + "_treatment-both-passes", self.id)
+        return os.path.join(self.prefix + "_merge_all-both-passes", self.id)
 
-    @property
-    def hotspot_merge_5M_both_passes_prefix(self):
-        return os.path.join(self.prefix + "_5M_treatment-both-passes", self.id, "_5M")
 
     @property
     def hotspot_reps_both_passes_prefix(self):

@@ -27,8 +27,7 @@ import subprocess
 import math
 from optparse import OptionParser
 
-from CistromeAP.taolib.CoreLib.Parser import WiggleIO, BedIO
-from CistromeAP.taolib.CoreLib.BasicStat.Func import * 
+from gcap import BedIO
 
 try:
     from bx.bbi.bigwig_file import BigWigFile

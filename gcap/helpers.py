@@ -125,7 +125,6 @@ def single_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": "
     fastq_sample.close()
     fastq.close()
 
-
 def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}, param = {"random_number": ""}):
     def write_random_records(fqa, fqb, suba, subb, N=100000):
         records = sum(1 for _ in open(fqa)) / 4
@@ -148,6 +147,10 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fha.close()
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
+
+def sample_samfiles(input = {"sam": ""}, output = {"": ""}):
+
+    pass
 
 ## summary of library contamination
 def stat_contamination(input = {"bowtie_summaries": [[]]},
@@ -329,15 +332,7 @@ def stat_cor(input={"correlation_R":"", "cor_pdf": "", "venn": "", },
 def stat_promotor(input = {"ceas_r": ""}, output = {"json": ""}, param=None):
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}
     promotor_percentage = []
-    with open(input["ceas_r"], 'rU') as f:
-        for line in f.readlines():
-            if line.startswith("pie"):
-                extract = re.findall("pie\(x=x,labels=c\(" + "(.*)" + "\)", line)
-                content =  extract[0].split(",")
-                promotor_percentage.append(content[0])
-    json_dict["stat"]["genome"] = promotor_percentage[0]
-    json_dict["stat"]["peaks"] = promotor_percentage[1]
-    json_dump(json_dict)
+
 
 def stat_conserv(input = "", output = "", param = None):
     json_dict = {"input": input, "output": output, "param": param, "stat": ""}

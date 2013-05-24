@@ -14,6 +14,7 @@ First, install pipeline framework:
 Install FastQC
 ------------------
 *Site* 	<http://www.bioinformatics.babraham.ac.uk/projects/fastqc/>
+This part will be replaced by Jim's codes
 
 Install Bowtie
 ----------------
@@ -54,9 +55,18 @@ install picard
 --------------------
 Use picard for SortSam, Markduplicates for both single end and pair end data.
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
-For single end data, we used MACS2 predictd
+For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R
 
 ----
+
+install UCSC component
+-------------------------
+*Site* <http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/>
+`BedClip` is used to remove outlier chromosome locations.
+`bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle
+
+Recommended by Jim, we would use `wigCorrelate` for replicates consistency evaluation.
+
 
 Built-in modules
 -------------------
@@ -70,6 +80,9 @@ install each of the packages contained in `cistrome-applications-harvard` repo
 
 * download gene_tables for CEAS and Phastcon score bigwiggles of Placetalmammals for human and mouse
 * use the lastest repo
+
+
+
 
 
 Install latex
@@ -132,21 +145,22 @@ GCAP.py run -c GCAP_pe.conf --from 1 --to 3 --resume
 Prototype  Features
 ======================
 
-1. estimate per sequence quality and library contamination by using 100k sampled reads
+1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa)
 
-2. reads mapping and peaks calling on replicates all reads and 5M sampled reads
+2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2, sampling by Picard)
 
 3. peaks calling on combo of all reads and 5M sampled reads
+4. estimate library complexity/redundancy (picard, this will be replaced by Consensus)
 
-4. estimates SPOT score for 5M reads
+4. estimates SPOT score for 5M reads (Hotspot)
 
-5. estimate replicates consistency by using 5M sampled data union peaks by bigwiggle and by peaks regions overlap
+5. estimate replicates consistency by using 5M sampled data union peaks by bigwiggle and by peaks regions overlap(bedtools and wigCorrelate)
 
-6. calculate peaks promotor percentage and compare with genome promotor percentage for 5M reads
+6. calculate peaks promotor percentage and compare with genome promotor percentage for 5M reads(built-in script)
 
-7. calculate Phastcon score of top 1000 non-promotor peaks regions in 100 bp width around summits for 5M reads
+7. calculate Phastcon score of top 1000 non-promotor peaks regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
 
-8. estimate peaks overlap with DHS on replicates and combo by 5M reads
+8. estimate peaks overlap with DHS on replicates and combo by 5M reads(bedops)
 
 Optionally
 ===========
