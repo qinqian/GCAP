@@ -232,99 +232,6 @@ def _bwa(workflow, conf):
             tool = "bwa",
             input = {"index": conf.get("lib", "genome_index"), "fastq": conf.sample_targets}))
 
-def _macs2(workflow, conf):
-    # merge all treatments into one
-    merge_bams_treat = ShellCommand(
-        "{tool} merge {output[merged]} {param[bams]}",
-        tool="samtools",
-        input=[target + ".bam" for target in conf.treatment_targets],
-        output={"merged": conf.prefix + "_treatment.bam"})
-    merge_bams_treat.param = {"bams": " ".join(merge_bams_treat.input)}
-
-    macs2_on_merged = attach_back(workflow, ShellCommand(
-        "{tool} callpeak -B -q 0.01 --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
-        {param[treat_opt]} {param[control_opt]} -n {param[description]}",
-        tool="macs2",
-        input={"treat": conf.prefix + "_treatment.bam"},
-        output={"peaks": conf.prefix + "_peaks.bed",
-                "summit": conf.prefix + "_summits.bed",
-                "treat_bdg": conf.prefix + "_treat_pileup.bdg",
-                "ENCODE": conf.prefix + "_peaks.encodePeak",
-                "peaks_xls": conf.prefix + "_peaks.xls",
-                "control_bdg": conf.prefix + "_control_lambda.bdg"},
-        param={"description": conf.prefix,
-               "keep_dup": 1,
-               "shiftsize": 73,
-               "species": "hs"},
-        name="macs2_callpeak_merged"))
-    macs2_on_merged.param["treat_opt"] = "-t " + macs2_on_merged.input["treat"]
-    macs2_on_merged.update(param=conf.items("macs2"))
-
-    ## BedClip
-    bdg2bw_treat = attach_back(workflow,
-        ShellCommand(
-            "{tool} {input[bdg]} {input[chrom_len]} {output[bw]}",
-            tool="bedGraphToBigWig",
-            input={"bdg": conf.prefix + "_control_lambda.bdg.tmp",
-                   "chrom_len": conf.get("lib", "chrom_len")},
-            output={"bw": conf.prefix + "_control.bw"},
-            name="bdg_to_bw"))
-
-def _macs2_on_sample(workflow, conf):
-    # Though macs command already exists, I choose not to use prototype here
-    # Because the prototype definition and usage might be far from each other, making codes not readable
-    for target in conf.treatment_targets:
-        macs2_on_rep = attach_back(workflow,
-            ShellCommand(
-                "{tool} callpeak -B -q 0.01 --keep-dup all --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
-                {param[treat_opt]} {param[control_opt]} -n {param[description]}",
-                tool="macs2",
-                input={"treat": target + ".bam"},
-                output={"peaks": target + "_peaks.bed",
-                        "summit": target + "_summits.bed",
-                        "treat_bdg": target + "_treat_pileup.bdg",
-                        "ENCODE": target + "_peaks.encodePeak",
-                        "peaks_xls": target + "_peaks.xls",
-                        "control_bdg": target + "_control_lambda.bdg"},
-                param={"description": target, "keep_dup": 1, "shiftsize": 73, "species": "hs"},
-                name="macs2_callpeak_rep"))
-        macs2_on_rep.param["treat_opt"] = "-t " + macs2_on_rep.input["treat"]
-        # control option is skipped if control samples does not exist
-        if len(conf.control_targets) >= 1:
-            macs2_on_rep.input["control"] = conf.prefix + "_control.bam"
-            macs2_on_rep.param["control_opt"] = "-c " + macs2_on_rep.input["control"]
-        else:
-            macs2_on_rep.param["control_opt"] = ""
-
-        macs2_on_rep.update(param=conf.items("macs2"))
-
-        ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
-        ## filter bdg file to remove over-border coordinates
-        bdg_trim_controlrep = attach_back(workflow,
-            ShellCommand(
-                '{tool} intersect -a {input} -b {param[chrom_bed]} -wa -f 1.00 > {output}',
-                tool="bedtools",
-                input=target + "_control_lambda.bdg",
-                output=target + "_control_lambda.bdg.tmp",
-                param={'chrom_bed': conf.get("lib", "chrom_bed")},
-                name="bedGraph replicate filtering"))
-        bdg_trim_treatrep = bdg_trim_controlrep.clone
-        bdg_trim_treatrep.input = target + "_treat_pileup.bdg"
-        bdg_trim_treatrep.output = target + "_treat_pileup.bdg.tmp"
-        attach_back(workflow, bdg_trim_treatrep)
-
-        bdg2bw_treatrep = attach_back(workflow,
-            ShellCommand(
-                "{tool} {input} {param[chrom_len]} {output}",
-                tool="bedGraphToBigWig",
-                input=target + "_treat_pileup.bdg.tmp",
-                output=target + "_treat.bw",
-                param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
-        # prototype used here to do the similar thing on treatment file
-        bdg2bw_controlrep = bdg2bw_treatrep.clone
-        bdg2bw_controlrep.input = target + "_treat_pileup.bdg.tmp"
-        bdg2bw_controlrep.output = target + "_treat.bw"
-        attach_back(workflow, bdg2bw_controlrep)
 
 def _reads_mapping(workflow, conf):
     """
@@ -500,22 +407,29 @@ def _hotspot_on_replicates(workflow, conf):
         param = None))
     ## evaluate replicates total peaks for 5M and all reads
 
-def _hotspot_reps_preprocessing(workflow, conf):
+def _peaks_reps_preprocess(workflow, conf):
     """
     remove blacklist and outlier
     """
+
     has_velcro = conf.get("lib", "velcro")  ## mouse not have blacklist yet
     for i, target in enumerate(conf.treatment_targets):
         ## remove blacklist for human
         ## mouse no blacklist ??
+        if conf.peakcalltool == "hotspot":
+            input_peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed"
+            non_velcro = target + "_5M_velcro_non_overlap_peaks.bed"
+        elif conf.peakcalltool == "macs2":
+            input_peaks = target + "_5M_macs2_peaks.bed"
+            non_velcro = target + "_5M_macs2_velcro_non_overlap_peaks.bed"
         if has_velcro:
             attach_back(workflow,
                 ShellCommand(
                     "{tool} -v -a {input[peaks]} -b {input[velcro_peaks_bed]} > {output}",
                     tool="intersectBed",
-                    input={"peaks": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
-                       "velcro_peaks_bed": conf.get("lib", "velcro")},
-                    output = target + "_5M_velcro_non_overlap_peaks.bed",
+                    input={"peaks": input_peaks,
+                           "velcro_peaks_bed": conf.get("lib", "velcro")},
+                    output = non_velcro,
                     name = "filter blacklist",
                     param=None))
         else: ## for mouse, just rename to *_5M_velcro_non_overlap_peaks.bed
@@ -523,8 +437,8 @@ def _hotspot_reps_preprocessing(workflow, conf):
                 ShellCommand(
                     "cp {input[peaks]} {output}",
                     tool="cp",
-                    input={"peaks": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed"},
-                    output = target + "_5M_velcro_non_overlap_peaks.bed",
+                    input={"peaks": input_peaks},
+                    output = non_velcro,
                     name = "No blacklist, not filter blacklist",
                     param=None))
 
@@ -533,8 +447,8 @@ def _hotspot_reps_preprocessing(workflow, conf):
             ShellCommand(
                 "{tool} '{{if ($2 >= 0 && $2 < $3) print}}' {input} > {output}",
                 tool="awk",
-                input = target + "_5M_velcro_non_overlap_peaks.bed",
-                output = target + "_5M_velcro_non_overlap_peaks.bed.tmp",
+                input = non_velcro,
+                output = non_velcro + ".tmp",
                 name = "filter bed files outlier location"))
 
         # prototype used here to do the similar thing on bedclip
@@ -542,42 +456,52 @@ def _hotspot_reps_preprocessing(workflow, conf):
             ShellCommand(
                 template="{tool} {input} {param[chrom_len]} {output}",
                 tool="bedClip",
-                input=target + "_5M_velcro_non_overlap_peaks.bed.tmp",
-                output = target + "_5M_velcro_non_overlap_peaks.bed.final",
+                input=non_velcro + ".tmp",
+                output = non_velcro + ".final",
                 param={'chrom_len': conf.get_path("lib", "chrom_len")},
                 name="bedclip filter"))
-
         bed_clip.allow_fail = True
 
-def _hotspot_reps_evaluation(workflow, conf):
+def _peaks_reps_evaluating(workflow, conf):
     ## use 5M reads to evaluate
-
     ## intersect region ratio in pairwise ways
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):
+            if conf.peakcalltool == "hotspot":
+                one_rep = conf.treatment_targets[i] + "_5M_velcro_non_overlap_peaks.bed.final"
+                another_rep = conf.treatment_targets[j] + "_5M_velcro_non_overlap_peaks.bed.final"
+            elif conf.peakcalltool == "macs2":
+                one_rep = conf.treatment_targets[i] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+                another_rep =  conf.treatment_targets[j] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
             attach_back(workflow,
                 ShellCommand(
                     "{tool} -a {input[one_rep]} -b {input[another_rep]} > {output}",
                     tool="intersectBed",
-                    input = {"one_rep": conf.treatment_targets[i] + "_5M_velcro_non_overlap_peaks.bed.final",
-                             "another_rep": conf.treatment_targets[j] + "_5M_velcro_non_overlap_peaks.bed.final"},
-                    output= conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "_5M_velcro_non_overlap_peaks.bed.final",
+                    input = {"one_rep": one_rep,
+                             "another_rep": another_rep},
+                    output= conf.treatment_targets[i] + "_reps_overlap_" + "rep" + str(i+1) + "rep" + str(j+1) + ".bed",
                     name = "replicates Overlap",
                     param=None))
 
-        ## correlation in union regions
-        ## Recommended by Jim, using wigCorrelate
-        for i in range(len(conf.treatment_targets)):
-            for j in range(i+1, len(conf.treatment_targets)):
-                attach_back(workflow,
-                    ShellCommand(
-                        "{tool} {input[one_rep]} {input[another_rep]} 1>{output}",
-                        tool="wigCorrelate",
-                        input = {"one_rep": conf.treatment_targets[i] + "_5M.bw",
-                                 "another_rep": conf.treatment_targets[j] + "_5M.bw"},
-                        output= conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score",
-                        name = "replicates Overlap",
-                        param=None))
+    ## correlation in union regions
+    ## Recommended by Jim, using wigCorrelate
+    for i in range(len(conf.treatment_targets)):
+        for j in range(i+1, len(conf.treatment_targets)):
+            if conf.peakcalltool == "macs2":
+                one_rep = conf.treatment_targets[i] + "_5M_macs2_treat.bw"
+                another_rep = conf.treatment_targets[j] + "_5M_macs2_treat.bw"
+            elif conf.peakcalltool == "hotspot":
+                one_rep = conf.treatment_targets[i] + "_5M.bw"
+                another_rep = conf.treatment_targets[j] + "_5M.bw"
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input[one_rep]} {input[another_rep]} 1>{output}",
+                    tool="wigCorrelate",
+                    input = {"one_rep": conf.treatment_targets[i] + "_5M.bw",
+                             "another_rep": conf.treatment_targets[j] + "_5M.bw"},
+                    output= conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score",
+                    name = "replicates bigwiggle correlation",
+                    param=None))
 
 def _hotspot_combo(workflow, conf):
     ## starchcat all replicates
@@ -615,6 +539,148 @@ def _hotspot_combo(workflow, conf):
                   "spot": conf.prefix + "_merge_all.spot.out"},
         param = None))
 
+
+def _macs2_on_reps(workflow, conf):
+    """
+    call peaks by MACS2, optionally
+    """
+    ## for all reads
+    for target in conf.treatment_targets:
+        ## keep all duplicate tags as hotspot
+        macs2_on_rep = attach_back(workflow,
+            ShellCommand(
+                "{tool} callpeak -B -q 0.01 -f {param[format]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                {param[treat_opt]} -n {param[description]}",
+                tool="macs2",
+                input={"treat": target + "_picard_sort.bam.all"},
+                output={"peaks": target + "_macs2_all_peaks.bed",
+                        "summit": target + "_macs2_all_summits.bed",
+                        "treat_bdg": target + "_macs2_all_treat_pileup.bdg",
+                        "ENCODE": target + "_macs2_all_peaks.encodePeak",
+                        "peaks_xls": target + "_macs2_all_peaks.xls",
+                        "control_bdg": target + "_macs2_all_control_lambda.bdg"},
+                param={"description": target + "_macs2_all", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
+                name="macs2_callpeak_rep"))
+        macs2_on_rep.param["treat_opt"] = "-t " + macs2_on_rep.input["treat"]
+        macs2_on_rep.update(param=conf.items("macs2"))
+        if conf.seq_type == "se":
+            macs2_on_rep.param["format"] = "BAM"
+        elif conf.seq_type == "pe":
+            macs2_on_rep.param["format"] = "BAMPE"
+
+        ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
+        ## filter bdg file to remove over-border coordinates
+        attach_back(workflow,
+            ShellCommand(
+                '{tool} intersect -a {input} -b {param[chrom_bed]} -f 1.00 > {output}',
+                tool="bedtools",
+                input=target + "_macs2_all_treat_pileup.bdg",
+                output=target + "_macs2_all_treat_pileup.bdg.tmp",
+                param={'chrom_bed': conf.get("lib", "chrom_bed")},
+                name="bedGraph replicate filtering"))
+
+        bdg2bw_treatrep = attach_back(workflow,
+            ShellCommand(
+                "{tool} {input} {param[chrom_len]} {output}",
+                tool="bedGraphToBigWig",
+                input=target + "_macs2_all_treat_pileup.bdg.tmp",
+                output=target + "_treat_all.bw",
+                param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
+
+    ## for 5M reads
+    for target in conf.treatment_targets:
+        ## keep all duplicate tags as hotspot
+        macs2_on_rep = attach_back(workflow,
+            ShellCommand(
+                "{tool} callpeak -B -q 0.01 -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                {param[treat_opt]} -n {param[description]}",
+                tool="macs2",
+                input={"treat": target + "_picard_sort.bam.5M"},
+                output={"peaks": target + "_5M_macs2_peaks.bed",
+                        "summit": target + "_5M_macs2_summits.bed",
+                        "treat_bdg": target + "_5M_macs2_treat_pileup.bdg",
+                        "ENCODE": target + "_5M_macs2_peaks.encodePeak",
+                        "peaks_xls": target + "_5M_macs2_peaks.xls",
+                        "control_bdg": target + "_5M_macs2_control_lambda.bdg"},
+                param={"description": target + "_5M_macs2", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
+                name="macs2_callpeak_rep"))
+        macs2_on_rep.param["treat_opt"] = "-t " + macs2_on_rep.input["treat"]
+        macs2_on_rep.update(param=conf.items("macs2"))
+
+        ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
+        ## filter bdg file to remove over-border coordinates
+        attach_back(workflow,
+            ShellCommand(
+                '{tool} intersect -a {input} -b {param[chrom_bed]} -f 1.00 > {output}',
+                tool="bedtools",
+                input=target + "_5M_macs2_treat_pileup.bdg",
+                output=target + "_5M_macs2_treat_pileup.bdg.tmp",
+                param={'chrom_bed': conf.get("lib", "chrom_bed")},
+                name="bedGraph replicate filtering"))
+
+        bdg2bw_treatrep = attach_back(workflow,
+            ShellCommand(
+                "{tool} {input} {param[chrom_len]} {output}",
+                tool="bedGraphToBigWig",
+                input=target + "_5M_macs2_treat_pileup.bdg.tmp",
+                output=target + "_5M_macs2_treat.bw",
+                param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
+
+def _macs2_on_combo(workflow, conf):
+    # merge all treatments into one
+    merge_bams_treat = ShellCommand(
+        "{tool} merge {output[merged]} {param[bams]}",
+        tool="samtools",
+        input=[ target + "_picard_sort.bam.all" for target in conf.treatment_targets],
+        output={"merged": conf.prefix + "_treatment.bam"})
+    merge_bams_treat.param = {"bams": " ".join(merge_bams_treat.input)}
+    attach_back(workflow, merge_bams_treat)
+
+    macs2_on_merged = attach_back(workflow, ShellCommand(
+        "{tool} callpeak -B -q 0.01 -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+        {param[treat_opt]} -n {param[description]}",
+        tool="macs2",
+        input={"merged": conf.prefix + "_treatment.bam"},
+        output={"peaks": conf.prefix + "_peaks.bed",
+                "summit": conf.prefix + "_summits.bed",
+                "treat_bdg": conf.prefix + "_treat_pileup.bdg",
+                "ENCODE": conf.prefix + "_peaks.encodePeak",
+                "peaks_xls": conf.prefix + "_peaks.xls",
+                "control_bdg": conf.prefix + "_control_lambda.bdg"},
+        param={"description": conf.prefix,
+               "keep_dup": "all",
+               "shiftsize": 50,
+               "species": conf.get("macs2",  "species")},
+        name="macs2_callpeak_merged"))
+
+    macs2_on_merged.param["treat_opt"] = " -t " + macs2_on_merged.input["merged"]
+    macs2_on_merged.update(param=conf.items("macs2"))
+
+    if conf.seq_type == "se":
+        macs2_on_merged.param["format"] = "BAM"
+    elif conf.seq_type == "pe":
+        macs2_on_merged.param["format"] = "BAMPE"
+
+    ## BedClip
+    ## prototype used here to do the similar thing on bedclip
+    bed_clip = attach_back(workflow,
+        ShellCommand(
+            template="{tool} {input} {param[chrom_len]} {output}",
+            tool="bedClip",
+            input=conf.prefix + "_treat_pileup.bdg",
+            output =conf.prefix + "_treat_pileup.bdg.tmp",
+            param={'chrom_len': conf.get_path("lib", "chrom_len")},
+            name="bedclip filter"))
+
+    bdg2bw_treat = attach_back(workflow,
+        ShellCommand(
+            "{tool} {input[bdg]} {input[chrom_len]} {output[bw]}",
+            tool="bedGraphToBigWig",
+            input={"bdg": conf.prefix + "_treat_pileup.bdg.tmp",
+                   "chrom_len": conf.get("lib", "chrom_len")},
+            output={"bw": conf.prefix + "_macs2_treat_all.bw"},
+            name="bdg_to_bw"))
+
 def _promoter_overlap(workflow, conf):
     """ use bedtools to get promotor peaks enrichment,
     Genome Promotor: cutoff 50% promotor overlaps with mappability regions bases number
@@ -631,6 +697,8 @@ def _promoter_overlap(workflow, conf):
 #            output = {"count": conf.prefix + "_promotor_bases.count"},
 #            param = {"percentage": "0.5"}))
 
+    ## use hotspot mappable_region for both hotspot and macs2 peak calling
+
     attach_back(workflow,
         ShellCommand(
             "{tool} -e -{param[percentage]} {input[ref]} {input[map]} > {output[count]}",
@@ -641,11 +709,15 @@ def _promoter_overlap(workflow, conf):
 
     ## peaks region evaluation
     for i, target in enumerate(conf.treatment_targets):
+        if conf.peakcalltool == "hotspot":
+            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+        elif conf.peakcalltool == "macs2":
+            peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
         attach_back(workflow,
             ShellCommand(
                 "{tool} -e -{param[percentage]} {input[ref]} {input[promotor]} | wc -l > {output[count]}",
                 tool = "bedops",
-                input = {"ref": target + "_5M_velcro_non_overlap_peaks.bed.final",
+                input = {"ref": peaks,
                          "promotor": conf.get("lib", "tss")},
                 output = {"count": target + "_5M_promotor_overlap.count"},
                 param = {"percentage": "50%"},
@@ -664,12 +736,22 @@ def _conservation(workflow, conf):
     ## use 5M reads for evaluation
     for target in conf.treatment_targets:
         ## get non-promotor peaks regions
+        if conf.peakcalltool == "hotspot":
+            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+            non_promotor = target + "_5M_non-promotor_peaks_bed"
+            phascon = target + "_100bp_phastcon.score"
+            json = target + "_top1000_100bp_phast.json"
+        elif conf.peakcalltool == "macs2":
+            peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+            non_promotor = target + "_macs2_5M_non-promotor_peaks_bed"
+            phascon = target + "_macs2_100bp_phastcon.score"
+            json = target + "_macs2_top1000_100bp_phast.json"
         attach_back(workflow,
             ShellCommand(
                 "{tool} -v -a {input[peaks]} -b {input[tss]} > {output}",
                 tool = "intersectBed",
-                input = {"peaks": target + "_5M_velcro_non_overlap_peaks.bed.final", "tss": conf.get("lib", "tss")},
-                output = target + "_5M_non-promotor_peaks_bed",
+                input = {"peaks": peaks, "tss": conf.get("lib", "tss")},
+                output = non_promotor,
                 name = "Get non-promotor peaks regions",
                 param = None))
 
@@ -677,8 +759,8 @@ def _conservation(workflow, conf):
             ShellCommand(
                 "{tool} -r -g -k 5 {input} | head -n {param[peaks]} > {output}",
                 tool="sort",
-                input=target + "_5M_non-promotor_peaks_bed",
-                output=target + "_5M_non_promotor.bed.top1000",
+                input=non_promotor,
+                output=non_promotor + ".top1000",
                 param={'peaks': 1000}, name="top summits for conservation"))
         get_top_peaks.update(param=conf.items('conservation'))
 
@@ -688,32 +770,39 @@ def _conservation(workflow, conf):
                 "{tool} -w {param[width]} -d {input[phastcon_db]} {input[bed]} 1>{output}",
                 tool = "conservation_average.py",
                 input= {"phastcon_db": conf.get_path("lib", "phast"),
-                        "bed": target + "_5M_non_promotor.bed.top1000"},
-                output = target + "_100bp_phastcon.score",
+                        "bed": non_promotor + ".top1000"},
+                output = phascon,
                 param = {"width": 100}))
 
         attach_back(workflow,
             PythonCommand(stat_conserv,
-                input = target + "_100bp_phastcon.score",
-                output = {"json": target + "_top1000_100bp_phast.json"},
+                input = phascon,
+                output = {"json": json},
                 param = None))
 
 def _union_DHS_overlap(workflow, conf):
     for target in conf.treatment_targets:
+        if conf.peakcalltool == "hotspot":
+            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+            output = target + "_DHS_overlap_peaks_bed"
+        elif conf.peakcalltool == "macs2":
+            peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+            output = target + "_macs2_DHS_overlap_peaks_bed"
+
         attach_back(workflow,
             ShellCommand(
                 "{tool} -wa -u  \
                 -a {input[pks_spot_bed]} -b {input[DHS_peaks_bed]} > {output}",
                 tool="intersectBed",
-                input={"pks_spot_bed": target + "_5M_velcro_non_overlap_peaks.bed.final",
+                input={"pks_spot_bed": peaks,
                        "DHS_peaks_bed": conf.get("lib", "dhs")},
-                output=conf.prefix + "_DHS_overlap_peaks_bed",
+                output=output,
                 name = "Write out DHS overlap BED",
                 param=None))
         attach_back(workflow, PythonCommand(
             stat_dhs,
-            input={"dhs_peaks": conf.prefix + "_DHS_overlap_peaks_bed",
-                   "pks_spot_bed":  target + "_5M_velcro_non_overlap_peaks.bed.final"},
+            input={"dhs_peaks": output,
+                   "pks_spot_bed":  peaks},
             output={"json": conf.json_prefix + "_dhs.json"},
             param=None,
             name="DHS summary"))
@@ -786,9 +875,11 @@ def create_workflow(args, conf):
         "if [ ! -d '{output}' ]; then mkdir -p {output}; fi",
         output=conf.target_dir))
 
+    ## TODO: replace this by Jim's codes
     if need_run(1):
         bld.build(_fastqc)
 
+    ## TODO: add bwa
     if need_run(2):
         bld.build(_lib_contamination)
 
@@ -802,19 +893,27 @@ def create_workflow(args, conf):
         bld.build(_fragment_size)
 
     if need_run(6):
-        if conf.get("tool", "peak_calling") == "hotspot":
+        if conf.peakcalltool == "hotspot":
             bld.build(_hotspot_on_replicates)
-            bld.build(_hotspot_reps_preprocessing)
-            if have_treat_reps:
-                bld.build(_hotspot_reps_evaluation)
-                bld.build(_hotspot_combo)
-        elif conf.get("tool", "peak_calling") == "macs2":
-            pass
+        elif conf.peakcalltool == "macs2":
+            bld.build(_macs2_on_reps)
 
+        bld.build(_peaks_reps_preprocess)
+
+        if have_treat_reps:
+            bld.build(_peaks_reps_evaluating)
+            if conf.peakcalltool == "hotspot":
+                bld.build(_hotspot_combo)
+            elif conf.peakcalltool == "macs2":
+                bld.build(_macs2_on_combo)
+
+    ## need modify here
     if need_run(7):
         bld.build(_promoter_overlap)
+
     if need_run(8):
         bld.build(_conservation)
+
     if has_dhs and need_run(9):
         bld.build(_union_DHS_overlap)
 #    if need_run(10):

@@ -148,10 +148,6 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
 
-def sample_samfiles(input = {"sam": ""}, output = {"": ""}):
-
-    pass
-
 ## summary of library contamination
 def stat_contamination(input = {"bowtie_summaries": [[]]},
                        output = {"json": ""}, param = {"samples": "", "species": "", "id": ""}):

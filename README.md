@@ -103,9 +103,53 @@ If input is pair end data, use `,` to separate pairs, `;` to separate replicates
 instructions on conf files:
 	
 	[Basis]
-	...
 	treat = rep_1_pair1, rep_1_pair2; rep_2_pair1, rep_2_pair2
-	...
+	seq_type = pe   ## pe for pair end data, se for single end data
+	user = qinq
+	id = testid
+	species = hg19
+	output = results_path
+	read_length = 50
+	
+	[tool]
+	mapping = bowtie ## or bwa, not finish yet
+	peak_calling = hotspot ## or macs2, finish
+	
+	[picard]
+	markdup = path   ## MarkDuplicates.jar path
+	sort = path      ## SortSam.jar, for converting and sorting
+	threads = 4    
+	sample = path	 ## DownsampleSam.jar path
+	
+	[contaminate]    ## for library contamination evaluation, bowtie or bwa index
+	hg19 = /mnt/Storage/data/Bowtie/hg19
+	mm9 = /mnt/Storage/data/Bowtie/mm9
+	rn4 = /mnt/Storage/home/qinq/projects/chilin/rn4_index/rn4
+	
+	[fastqc]
+	threads = 5
+	
+	[bowtie] ## if using bowtie
+	max_aign = 1  ## keep unique mappable reads or not
+	
+	[lib] ## external data
+	genome_index = /mnt/Storage/data/Bowtie/hg19                                       ## bowtie or bwa index
+	chrom_bed =  /mnt/Storage/home/qinq/lib/chr_limit_hg19.bed                         ## chromosome limitation BED file
+	dhs = /mnt/Storage/data/DHS/DHS_hg19.bed                                           ## union DHS sites
+	velcro = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed ## black list
+	phast = /mnt/Storage/data/sync_cistrome_lib/conservation/hg19/placentalMammals/    ## Phastcon score from UCSC
+	tss = /mnt/Storage/home/qinq/lib/refgenes/hg19.refgene.tss                         ## +- 1kb tss extracted from UCSC refgene 
+	
+	[hotspot]
+	chrom_info = chromosome_info   ## from hotspot website	
+	mappable_region = path  ## this is downloaded from hotspot website, it's a necessary part for evaluating genomic promotor percentage
+	
+	## if your peak caller is macs2	, fill the following parameters
+	[macs]
+	species = hs
+	keep_dup = all ## keep all duplicate tags
+	shiftsize = 50 ## could be customized
+	
 
 	[lib] 
 	tss = 
@@ -133,12 +177,15 @@ resume process when problems occurs:
 	GCAP.py run -c GCAP_pe.conf --resume
 
 
-* skip steps
-GCAP.py run -c GCAP_pe.conf --skip 9 --resume
+* Step control
 
-* from and to
+	- skip steps:
 
-GCAP.py run -c GCAP_pe.conf --from 1 --to 3 --resume
+    		GCAP.py run -c GCAP_pe.conf --skip 9 --resume
+
+	- from and to:
+	
+		   	GCAP.py run -c GCAP_pe.conf --from 1 --to 3 --resume
 
 ----
 
