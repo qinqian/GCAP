@@ -103,6 +103,286 @@ def template_dump(jinja_template):
     with open(jinja_template.param["render_dump"], "w") as f:
         f.write(jinja_template.result)
 
+
+def begin_doc(input = "", output = {"begin": "", "header": ""}, param = {"rep": ""}):
+    ## begin document
+    begin_latex = JinjaTemplateCommand(
+        template = input,
+        name = "begin",
+        param = {"section_name": "begin",
+                 "render_dump": output["begin"]})
+    template_dump(begin_latex)
+
+    header_latex = JinjaTemplateCommand(
+        template = input,
+        name = "header",
+        param = {"section_name": "header",
+                 "render_dump": output["header"],
+                 "reps": param["rep"]})
+    template_dump(header_latex)
+
+def end_doc(input = {"tex": ""}, output = {"table_end": "", "doc_end": ""}, param = {}):
+    """
+    table end and latex end
+    """
+    table_end_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "end",
+        param = {"section_name": "table_end",
+                 "render_dump": output["table_end"]})
+
+    template_dump(table_end_latex)
+
+    end_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "end",
+        param = {"section_name": "end",
+                 "render_dump": output["doc_end"]})
+    template_dump(end_latex)
+
+def DHS_doc(input = {"json": "", "tex": ""}, output = {"latex": ""}, param = {"reps": ""}):
+    data = json_load(input["json"])["stat"]
+    print(data)
+    dhs = []
+    for s in data:
+        dhs.append(decimal_to_latex_percent(data[s]["dhspercentage"]))
+
+    DHS_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "DHS",
+        param = {"section_name": "DHS",
+                 "render_dump": output["latex"],
+                 "DHS": dhs,
+                 "reps": param["reps"]})
+    template_dump(DHS_latex)
+
+def reads_doc(input = {"tex": "", "json": ""}, output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": ""}):
+    """
+    these values will be replaced by Jim's codes,
+    currently by bowtie and fastqc
+    """
+    json = json_load(input["json"])["stat"]
+
+    if param["seq_type"] == "se":
+        raw =  [ json[j]["total_reads"] for j in json ]
+        mapped_number = [ json[j]["mappable_reads"] for j in json ]
+    else:
+        raw =  [ json[j]["total_reads"] * 2 for j in json ]
+        mapped_number = [ json[j]["mappable_reads"] * 2 for j in json ]
+
+    mapped_rate = [ json[j]["mappable_rate"] for j in json ]
+
+    print(param["reps"])
+
+    reads_latex = JinjaTemplateCommand(
+        template = input['tex'],
+        name = "raw_reads",
+        param = {"section_name": "raw_reads",
+                 "render_dump": output["raw"],
+                 "reads": raw,
+                 "reps": param["reps"],
+                 "combo": sum(raw)})
+
+    template_dump(reads_latex)
+
+    mapping_latex = JinjaTemplateCommand(
+        template = input['tex'],
+        name = "reads mapping",
+        param = {"section_name": "mapping",
+                 "render_dump": output["mapping"],
+                 "map": mapped_rate, "combo": sum(mapped_number),
+                 "reps": param["reps"]})
+
+    template_dump(mapping_latex)
+
+def fastqc_doc(input = {"tex": "", "json": ""}, output = {}, param = {"reps": ""}):
+    if type(input["json"]) == str:
+        json = json_load(input['json'])
+        seq = [ json["stat"][d]["median"] for d in json["stat"] ]
+        len = [ str(json['stat'][d]['sequence_length']) + param["seq_type"].upper() for d in json['stat'] ]
+    elif type(input["json"]) == list:
+        seq = []
+        len = []
+        for j in input["json"]:
+            pair_seq = []
+            pair_len = []
+            data = json_load(j)
+            for d in data["stat"]:
+                pair_seq.append(str(data['stat'][d]['median']))
+                pair_len.append(str(data['stat'][d]['sequence_length']) + param["seq_type"].upper())
+
+            seq.append(','.join(pair_seq))
+            len.append(','.join(pair_len))
+
+    seq_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "sequence quality",
+        param = {"section_name": "sequence_quality",
+                 "render_dump": output["seq"],
+                 "seq_quality": seq,
+                 "reps": param["reps"]})
+
+    len_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "reads_len",
+        param = {"section_name": "reads_length",
+                 "render_dump": output["len"],
+                 "reads_len": len,
+                 "reps": param["reps"]})
+
+    template_dump(seq_latex)
+    template_dump(len_latex)
+
+def redundancy_doc(input = {"tex": "", "json": ""}, output = {"redun": ""}, param = {"reps": ""}):
+
+    redun = json_load(input["json"])["stat"]
+    data = []
+    for d in redun:
+        print(d)
+        data.append(redun[d])
+
+    redun_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "Library complexity",
+        param = {"section_name": "redundancy",
+                 "render_dump": output["redun"],
+                 "redun": data,
+                 "reps": param["reps"]})
+
+    template_dump(redun_latex)
+
+def stat_redun(input = {"picard": ""}, output = {"json": ""}, param = {}):
+    """
+    this will be replaced by Gifford's codes,
+    currently picard
+    """
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+    for f in input["picard"]:
+        data = open(f).readlines()[7]
+        d = data.split("\t")[7]
+        json_dict["stat"][f] = d
+
+    json_dump(json_dict)
+
+def get_size(rscript):
+    values = {}
+    with open(rscript) as model:
+        for line in model:
+            if line.startswith("p <- "):
+                values["positive"] = line
+            if line.startswith("m <- "):
+                values["minus"] = line
+            if line.startswith("x <- "):
+                values["x"] = line
+            if line.startswith("altd"):
+                frag_size = re.findall("c\((\d+)\)", line)
+                values["frag"] = frag_size
+    return values
+
+def stat_frag_std(input = {"r": ""}, output = {"json": "", "r": ""}, param = {}):
+    json_dict = {"input": input, "output": output, "param": param, "stat": []}
+    for rin, rout in zip(input["r"], output["r"]):
+        print(rin)
+        print(rout)
+        values = get_size(rin)
+        with open(rout, 'w') as f:
+            f.write(values['positive'])
+            f.write(values['minus'])
+            f.write(values['x'])
+            f.write("p.expect = sum(x * p/100) \n")
+            f.write("m.expect = sum(x * m/100) \n")
+            f.write("p.sd = sqrt(sum(((x-p.expect)^2)*p/100)) \n")
+            f.write("m.sd = sqrt(sum(((x-m.expect)^2)*m/100)) \n")
+            f.write("cat(paste((p.sd + m.sd)/2, '\n')) \n")
+
+        std = os.popen("Rscript %s" % rout).read().strip()
+        json_dict["stat"].append("mean %s, sd %s" % (std, values["frag"][0]))
+    json_dump(json_dict)
+
+def frag_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"reps": ""}):
+
+    frag = json_load(input["json"])["stat"]
+
+    frag_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "fragment",
+        param = {"section_name": "fragment",
+                 "render_dump": output["latex"],
+                 "frag": frag,
+                 "reps": param["reps"]})
+    template_dump(frag_latex)
+
+def stat_peaks(input = {"peaks": {"all": "", "5M": "", "combo": ""}}, output = {"json"}, param = {"tool": ""}):
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+
+    json_dict["stat"]["all"] = {}
+
+    for a in input["peaks"]["all"]:
+        with open(a) as f:
+           json_dict["stat"]["all"][a] = len(f.readlines())
+
+    json_dict["stat"]["5M"] = {}
+    for s in input["peaks"]["5M"]:
+        with open(a) as f:
+            json_dict["stat"]["5M"][s] = len(f.readlines())
+
+    json_dict["stat"]["combo"] = {}
+    if len(input["peaks"]["all"]) >= 2:
+        with open(input["peaks"]["combo"]) as combo:
+            json_dict["stat"]["combo"]= len(combo.readlines())
+    json_dump(json_dict)
+
+def peaks_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"samples": "", "reps": ""}):
+    data = json_load(input["json"])
+    peaks_5M = data["stat"]["5M"].values()
+    peaks_all = data["stat"]["all"].values()
+
+    if "combo" in data["stat"]:
+
+        combo = data["stat"]["combo"]
+        peaks_latex = JinjaTemplateCommand(
+            template = input["tex"],
+            name = "peaks_calling",
+            param = {"section_name": "peaks_calling",
+                     "render_dump": output["latex"],
+                     "peaks_5M": peaks_5M,
+                     "peaks_all":peaks_all, "combo": combo,
+                     "tool": data["param"]["tool"],
+                     "reps": param["reps"]})
+
+    else:
+        peaks_latex = JinjaTemplateCommand(
+            template = input["tex"],
+            name = "peaks_calling",
+            param = {"section_name": "peaks_calling",
+                     "render_dump": output["latex"],
+                     "peaks_5M": peaks_5M,
+                     "peaks_all": peaks_all,
+                     "tool": data["param"]["tool"]})
+    template_dump(peaks_latex)
+
+
+
+def promotor_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"samples": "", "reps": ""}):
+
+    stat = json_load(input["json"])["stat"]
+    genome = stat["genome_promotor_percentage"]
+    peaks = stat["promotor_percentage"].values()
+
+    add_genome = lambda x: "peaks: " + x + ", genome: " + genome
+    peaks_genome = map(add_genome, peaks)
+
+    promotor_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "promotor",
+        param = {"section_name": "promotor",
+                 "render_dump": output["latex"],
+                 "promotor": peaks_genome,
+                 "reps": param["reps"]})
+
+    template_dump(promotor_latex)
+
+
 def single_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}, param = {"random_number": ""}):
     num_lines = sum(1 for _ in open(input["fastq"])) / 4
 
@@ -150,8 +430,8 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
 
 ## summary of library contamination
 def stat_contamination(input = {"bowtie_summaries": [[]]},
-                       output = {"json": ""}, param = {"samples": "", "species": "", "id": ""}):
-
+                       output = {"json": ""}, param = {"samples": "", "species": "", "id": "", "correct_species": ""}):
+    ## if library is contaminated, break
     library_contamination = {}
     library_contamination["header"] = {"sample": "sample name", "species": param["species"]}
     library_contamination["value"] = {}
@@ -162,6 +442,17 @@ def stat_contamination(input = {"bowtie_summaries": [[]]},
             ## species 1, species2, species3
             parsed_summary = _bowtie_summary_parse(i)
             library_contamination["value"][s][j] = parsed_summary["mappable_rate"]
+
+    for s in library_contamination["value"]:
+        # s for different samples
+        for i in param["species"]:
+            # i for species, check each species
+            if i != param["correct_species"]:
+                if library_contamination["value"][s][param["correct_species"]] > library_contamination["value"][s][i] :
+                    print("Library is correct !")
+                else:
+                    print("Library may be contaminated !")
+                    sys.exit(1)
 
     json_dict = {"stat": {}, "input": input, "output": output, "param": param}
     json_dict["stat"] = library_contamination
@@ -236,15 +527,7 @@ def stat_bowtie(input={"bowtie_summaries": []},
     for summary, sam in zip(input["bowtie_summaries"], param["sams"]):
         json_dict["stat"][sam] = _bowtie_summary_parse(summary)
         json_dict["stat"][sam]["cutoff"] = 0.5 # mappable reads
-    json_dump(json_dict)
 
-
-def stat_markdup(input = {"markdup": ""},
-                 output = {"json": ""},
-                 param = None):
-    data = open(input["markdup"]).readlines()
-    dup = data[7].split("\t")
-    json_dict = {"input": input, "output": output, "param": param, "stat": dup}
     json_dump(json_dict)
 
 def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom_info": ""},
@@ -269,22 +552,7 @@ def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom
     setting(cf, "_CHECK_", "F")         ## change to F in case that hotspot error for no wavelets peaks, other method
     cf.write(open(output["conf"], "w"))
 
-def stat_spot(input = {"spot_files": ""}, output = {"json": ""},
-              param = None):
-    spot = {}
-    spot["input"] = input
-    spot["output"] = output
-    print(input["spot_files"])
-    spot["stat"] = {}
-    with open(input["spot_files"], "rU") as f:
-        stat = f.readlines()[1].strip().split()
-        spot["stat"]["total"] = float(stat[0])
-        spot["stat"]["hotspot"] = float(stat[1])
-        spot["stat"]["spot"] = float(stat[2])
-    json_dump(spot)
-    return
-
-def stat_spot_on_replicates(input = {"spot_files": ""}, output = {"json": "", "R": "", "pdf": ""},
+def stat_spot_on_replicates(input = {"spot_files": ""}, output = {"json": ""},
                             param = None):
     spot = {}
     spot["input"] = input
@@ -300,42 +568,103 @@ def stat_spot_on_replicates(input = {"spot_files": ""}, output = {"json": "", "R
             spot["stat"][spot_file] = stat_dict
     json_dump(spot)
 
-def stat_peaks_number(input = {"peaks": ""}, output = {}):
-    """ evaluate two passes hotspot and peaks merge regions number """
-    data = open(input["peaks"]).readlines()
-    json_dict = {"input": input, "output": output, "stat": len(data)}
+def spot_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"sample": "", "reps": ""}):
+    data = json_load(input["json"])["stat"]
+    spot = []
+    for d in data:
+        spot.append(data[d]["spot"])
 
-def stat_reps(input={"peaks": ""},
+    spot_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "peaks_calling",
+        param = {"section_name": "spot",
+                 "render_dump": output["latex"],
+                 "spot": spot,
+                 "reps": param["reps"]})
+
+    template_dump(spot_latex)
+
+def stat_reps(input={"5M_overlap": "", "5M_cor": "", "union": ""},
              output={"json": ""}, param=None):
     ## overlap percentage between replicates
-    result_dict = {"stat": {}, "input": input, "output": output, "param": param}
-    json_dump(result_dict)
+    json_dict = {"stat": {}, "input": input, "output": output, "param": param}
+    with open(input["union"]) as f:
+        union_num = len(f.readlines())
 
-def stat_cor(input={"correlation_R":"", "cor_pdf": "", "venn": "", },
-             output={"json": ""}, param=None):
-    result_dict = {"stat": {}, "input": input, "output": output, "param": param}
-    with open(input["cor"], 'rU') as f:
-        value = f.readline()
-        values = value.strip().split()
-    correlation_list = [float(i) for i in values[1:-1]]
-    print(correlation_list)
-    result_dict["stat"]["cor"] = correlation_list
-    result_dict["stat"]["min_cor"] = min(correlation_list)
-    result_dict["stat"]["judge"] = "Pass" if result_dict["stat"]["min_cor"] >= 0.6 else "Fail"
-    result_dict["stat"]["cutoff"] = 0.6
-    json_dump(result_dict)
+    json_dict["stat"]["overlap"] = {}
+    for rep in input["5M_overlap"]:
+        rep_overlap = len(open(rep[0]).readlines())
+        json_dict["stat"]["overlap"][rep[1]] = "%s %s, %s" % (rep[1], rep_overlap, decimal_to_latex_percent(float(rep_overlap) / union_num))
 
-def stat_promotor(input = {"ceas_r": ""}, output = {"json": ""}, param=None):
-    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
-    promotor_percentage = []
+    json_dict["stat"]["cor"] = {}
+    for rep in input["5M_cor"]:
+        with open(rep[0]) as f:
+            rep_cor = f.read().strip().split()[2]
+        json_dict["stat"]["cor"][rep[1]] = "%s %s" % (rep[1], rep_cor)
 
-
-def stat_conserv(input = "", output = "", param = None):
-    json_dict = {"input": input, "output": output, "param": param, "stat": ""}
-    with open(input, "rU") as f:
-        score = f.read().strip()
-        json_dict["stat"] = score
     json_dump(json_dict)
+
+
+def reps_doc(input = {"tex": "", "json": ""}, output = {}, param = {}):
+    data = json_load(input["json"])
+    cor = data['stat']["cor"].values()
+    overlap = data["stat"]["overlap"].values()
+    rep_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "replicates",
+        param = {"section_name": "replicates",
+                 "render_dump": "rep.tex",
+                 "overlap": overlap, "cor": cor})
+    template_dump(rep_latex)
+
+def stat_promotor(input = {"peaks_promotor": "", "peaks": "", "promotor": "", "mappable": ""}, output = {"json": ""}, param=None):
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+
+    json_dict["stat"]["promotor_percentage"] = {}
+    for overlap, peaks in zip(input["peaks_promotor"], input["peaks"]):
+        with open(overlap) as p:
+            overlap_num = p.read().strip().split()[0]
+        with open(peaks) as f:
+            peaks_num = f.read().strip().split()[0]
+
+        json_dict["stat"]["promotor_percentage"][peaks] = decimal_to_latex_percent(float(overlap_num) / float(peaks_num))
+
+    with open(input["promotor"]) as g:
+        promotor = g.read().strip().split()[0]
+
+    with open(input["mappable"]) as m:
+        mappable = len(m.readlines())
+
+    json_dict["stat"]["genome_promotor_percentage"] = decimal_to_latex_percent(float(promotor) / mappable)
+
+    json_dump(json_dict)
+
+
+def stat_conserv(input = {"phastcon": ""}, output = {"json": ""}, param = {"sample": ""}):
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+    print(input["phastcon"])
+    print(param["sample"])
+    for f, s in zip(input["phastcon"], param["sample"]):
+        with open(f, "rU") as phast:
+            score = phast.read().strip()
+
+            json_dict["stat"][s] = score
+
+    json_dump(json_dict)
+
+
+def conserv_doc(input = {"json": "", "tex": ""}, output = {"latex": ""}, param = {"reps": ""}):
+    data = json_load(input["json"])["stat"]
+    conserv = data.values()
+
+    conservation_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "conservation",
+        param = {"section_name": "conservation",
+                 "render_dump": output["latex"],
+                 "conservation": conserv,
+                 "reps": param["reps"]})
+    template_dump(conservation_latex)
 
 def stat_dhs(input={"pks_spot_bed": "", "dhs_peaks": ""}, output={"json": ""},
              param={}):
@@ -343,11 +672,12 @@ def stat_dhs(input={"pks_spot_bed": "", "dhs_peaks": ""}, output={"json": ""},
     overlap with union DHS
     """
     peaks_info = {}
-    peaks_info["total"] = len(open(input["pks_spot_bed"], 'r').readlines())
-    peaks_info["dhs"] = len(open(input["dhs_peaks"], 'r').readlines())
-    peaks_info['dhspercentage'] = peaks_info["dhs"] / peaks_info["total"]
-    result_dict = {"stat": {}, "input": input, "output": output, "param": param}
-    result_dict["stat"] = peaks_info
-    result_dict["stat"]["cutoff"] = 0.8
-    result_dict["stat"]["judge"] = "Pass" if result_dict["stat"]["dhspercentage"] >= 0.8 else "Fail"
-    json_dump(result_dict)
+    for b, d in zip(input["pks_spot_bed"], input["dhs_peaks"]):
+        peaks_info[b] = {}
+        peaks_info[b]["total"] = len(open(b, 'r').readlines())
+        peaks_info[b]["dhs"] = len(open(d, 'r').readlines())
+        peaks_info[b]['dhspercentage'] = peaks_info[b]["dhs"] / peaks_info[b]["total"]
+
+    json_dict = {"stat": {}, "input": input, "output": output, "param": param}
+    json_dict["stat"] = peaks_info
+    json_dump(json_dict)

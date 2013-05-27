@@ -70,24 +70,18 @@ Recommended by Jim, we would use `wigCorrelate` for replicates consistency evalu
 
 Built-in modules
 -------------------
-For this part, install cistrome-application temporarily. This will be replaced by `Bedtools` and `built-in modules from cistrome-application`.
-
-Use `mercurial` to get necessary packages:
-
-    hg clone https://bitbucket.org/cistrome/cistrome-applications-harvard
-    
-install each of the packages contained in `cistrome-applications-harvard` repo
-
-* download gene_tables for CEAS and Phastcon score bigwiggles of Placetalmammals for human and mouse
-* use the lastest repo
+This part is `built-in modules from cistrome-application`.
+include BedIO, FeatIO, Func
 
 
-
-
-
-Install latex
----------------
+Install latex and jinja2
+-------------------------
 Check whether `pdflatex` is executable or not.
+`jinja2` is a template module for rendering latex document:
+	
+	pip install jinja2
+	# for options
+	pip install argparse
 
 - - - -
 
@@ -150,10 +144,6 @@ instructions on conf files:
 	keep_dup = all ## keep all duplicate tags
 	shiftsize = 50 ## could be customized
 	
-
-	[lib] 
-	tss = 
-	...
 	
 for human should be the data contained in the static/hg19.refgene.tss, which is +- 1Kb from refseq tss, you could use your customized `promotor` regions
 
