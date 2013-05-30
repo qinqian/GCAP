@@ -39,9 +39,9 @@
 \usepackage[paperwidth=13in, paperheight=15in]{geometry}
 
 \begin{document}
-\title{DNase-Seq Quality Control Summary for Dataset  \color{ProcessBlue} XXX }
-\author{ENCODE DNase Group \\   Shirley lab \&   Kent Lab \& Stamatoyannopoulos Lab \&   Gifford Lab \\
-}
+\title{DNase-Seq Quality Control Summary for Dataset  \color{ProcessBlue} \VAR{dataset_id} }
+\author{ENCODE DNase Working Group}
+
 \date{\small\today}
 \vspace{-5cm}
 \maketitle
@@ -135,44 +135,44 @@
 %- if section_name == "spot"
   \midrule
 %- if reps >= 2
-  Signal / Noise (5M) & SPOT$>$0.4 & \VAR{spot | join(' & ')} & \\
+  Signal / Noise (5M) & SPOT$>$40\% & \VAR{spot | join(' & ')} & \\
 %- else
-  Signal / Noise (5M) & SPOT$>$0.4 & \VAR{spot | join(' & ')} \\
+  Signal / Noise (5M) & SPOT$>$40\% & \VAR{spot | join(' & ')} \\
 %- endif
 %- endif
 
 %- if section_name == "replicates"
   \midrule
-  Replicates Overlap(5M) & 70\% & \multicolumn{3}{c}{\VAR{overlap}} \\
+  Replicates Overlap (5M) & I/U $>$ 50\% & \multicolumn{3}{c}{\VAR{overlap | join(' ; ')}} \\
 
   \midrule
-  Rep Wig Corr in Union Peaks(5M) & $>$0.7 & \multicolumn{3}{c}{\VAR{cor}} \\
+  Rep Wig Corr in Union Peaks (5M) & $>$0.75 & \multicolumn{3}{c}{\VAR{cor | join(' ; ')}} \\
 %- endif
 
 %- if section_name == "promotor"
   \midrule
 %- if reps >= 2
-  Promotor \%(5M)  & $<$20\% & \VAR{promotor | join(' & ')} & \\
+  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} & \\
 %- else
-  Promotor \%(5M)  & $<$20\% & \VAR{promotor | join(' & ')} \\
+  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} \\
 %- endif
 %- endif
 
 %- if section_name == "conservation"
   \midrule
 %- if reps >= 2
-  Evolutionary Conservation(5M) & $>$0.2 &  \VAR{conservation | join(' & ')} & \\
+  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} & \\
 %- else
-  Evolutionary Conservation(5M) & $>$0.2 &  \VAR{conservation | join(' & ')} \\
+  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} \\
 %- endif
 %- endif
 
 %- if section_name == "DHS"
   \midrule
 %- if reps >= 2
-  Union DHS Overlap(5M) & $>$0.7 & \VAR{DHS | join(' & ')} & \\
+  Union DHS Overlap (5M) & $>$0.7 & \VAR{DHS | join(' & ')} & \\
 %- else
-  Union DHS Overlap(5M) & $>$0.7 & \VAR{DHS | join(' & ')}  \\
+  Union DHS Overlap (5M) & $>$0.7 & \VAR{DHS | join(' & ')}  \\
 %- endif
 %- endif
 

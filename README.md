@@ -55,7 +55,7 @@ install picard
 --------------------
 Use picard for SortSam, Markduplicates for both single end and pair end data.
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
-For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R
+For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R.
 
 ----
 
@@ -65,7 +65,7 @@ install UCSC component
 `BedClip` is used to remove outlier chromosome locations.
 `bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle
 
-Recommended by Jim, we would use `wigCorrelate` for replicates consistency evaluation.
+With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH) for replicates consistency evaluation on union peaks regions.
 
 
 Built-in modules
