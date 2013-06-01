@@ -282,24 +282,31 @@ def get_size(rscript):
                 values["frag"] = frag_size[0].split(",")
     return values
 
-def stat_frag_std(input = {"r": ""}, output = {"json": "", "r": ""}, param = {"samples": ""}):
+def stat_frag_std(input = {"r": "", "insert": ""}, output = {"json": "", "r": ""}, param = {"samples": "", "frag_tool": ""}):
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}
-    for rin, rout, s in zip(input["r"], output["r"], param["samples"]):
+    if param["frag_tool"] == "macs2":
+        ## single end
+        for rin, rout, s in zip(input["r"], output["r"], param["samples"]):
+            values = get_size(rin)
+            with open(rout, 'w') as f:
+                f.write(values['positive'])
+                f.write(values['minus'])
+                f.write(values['x'])
+                f.write("p.expect = sum(x * p/100) \n")
+                f.write("m.expect = sum(x * m/100) \n")
+                f.write("p.sd = sqrt(sum(((x-p.expect)^2)*p/100)) \n")
+                f.write("m.sd = sqrt(sum(((x-m.expect)^2)*m/100)) \n")
+                f.write("cat(paste((p.sd + m.sd)/2, '\n')) \n")
 
-        values = get_size(rin)
-        with open(rout, 'w') as f:
-            f.write(values['positive'])
-            f.write(values['minus'])
-            f.write(values['x'])
-            f.write("p.expect = sum(x * p/100) \n")
-            f.write("m.expect = sum(x * m/100) \n")
-            f.write("p.sd = sqrt(sum(((x-p.expect)^2)*p/100)) \n")
-            f.write("m.sd = sqrt(sum(((x-m.expect)^2)*m/100)) \n")
-            f.write("cat(paste((p.sd + m.sd)/2, '\n')) \n")
+            std = os.popen("Rscript %s" % rout).read().strip()
+            json_dict["stat"][s] = "mean %s, sd %s" % (max(map(int, values["frag"])), int(float(std)))
+        json_dump(json_dict)
 
-        std = os.popen("Rscript %s" % rout).read().strip()
-        json_dict["stat"][s] = "mean %s, sd %s" % (max(map(int, values["frag"])), int(float(std)))
-    json_dump(json_dict)
+    elif param["frag_tool"] == "picard":
+        for i, s in zip(input["insert"], param["samples"]):
+            with open(i, "rU") as dup:
+                data = dup.readlines()[7]
+            json_dict["stat"][s] = str(int(float(data[4]))) + ", sd " + str(int(float(data[5])))
 
 def frag_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"reps": "", "samples": ""}):
 

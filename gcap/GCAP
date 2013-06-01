@@ -94,6 +94,9 @@ def _sample_reads(workflow, conf, N, format):
                 output = {"bam": target + ".sam.%s" % suffix},
                 param = {"prog": conf.get("picard", "sample")}))
 
+        ## macs2 sampling 5M mappable reads, can't be apply to pair end sampling, output bed files
+        # macs2 randsample -t file -n 5000000
+
 def _fastqc(workflow, conf):
     """
     sample 100k reads for fastqc evaluation
@@ -316,8 +319,6 @@ def _library_complexity(workflow, conf):
 
     _sample_reads(workflow, conf, 5000000, "sam")
 
-
-
     # picard markduplicates need SortSam
     for target in conf.treatment_targets:
         lib_sort = attach_back(workflow, ShellCommand(
@@ -359,32 +360,44 @@ def _fragment_size(workflow, conf):
     Use macs2 for SE mode, bug: several fragment sizes available
     """
 
-#    if conf.seq_type == "pe":
-#        for target in conf.treatment_targets:
-#            insert_size = attach_back(workflow, ShellCommand(
-#                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
-#                tool = "java",
-#                input = {"bam": target + "_picard_sort.bam.5M"},
-#                output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
-#                param = {"threads": 4}))
-#            insert_size.update(param = conf.items("picard"))
+    ## picard for pair end
+    if conf.seq_type == "pe":
+        for target in conf.treatment_targets:
+            insert_size = attach_back(workflow, ShellCommand(
+                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
+                tool = "java",
+                input = {"bam": target + "_picard_sort.bam.5M"},
+                output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
+                param = {"threads": 4}))
+            insert_size.update(param = conf.items("picard"))
 
-    for target in conf.treatment_targets:
-        fragment_size = attach_back(workflow, ShellCommand(
-                                "{tool} predictd -i {input[bam]} --rfile {param[prefix]}",
-                                tool = "macs2",
-                                input = {"bam": target + "_picard_sort.bam.5M"},
-                                output = {"R": target + "_5M_model.R"},
-                                param = {"prefix": target + "_5M"}))
+        attach_back(workflow, PythonCommand(
+            stat_frag_std,
+            input = {"insert": [ target + "_insert_metric.5M" ]},
+            output = {"json": conf.json_prefix + "_frag.json"},
+            param = {"samples": conf.treatment_bases,
+                     "frag_tool": "picard"}))
 
-    ## extract standard deviation from MACS2 model.R,
-    ## use m, p, and pileup value for standard deviation; mean fragment size is provided.
-    ## TODO: need to improve
-    attach_back(workflow, PythonCommand(
-        stat_frag_std,
-        input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
-        output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
-        param = {"samples": conf.treatment_bases}))
+    ## macs2 for single end
+    else:
+        for target in conf.treatment_targets:
+            fragment_size = attach_back(workflow, ShellCommand(
+                                    "{tool} predictd -i {input[bam]} --rfile {param[prefix]}",
+                                    tool = "macs2",
+                                    input = {"bam": target + "_picard_sort.bam.5M"},
+                                    output = {"R": target + "_5M_model.R"},
+                                    param = {"prefix": target + "_5M"}))
+
+        ## extract standard deviation from MACS2 model.R,
+        ## use m, p, and pileup value for standard deviation; mean fragment size is provided.
+        ## TODO: need to improve MACS2 fragment size and standard deviation evaluation
+        ## add MACS2 pair end data fragment size evaluation for predictd
+        attach_back(workflow, PythonCommand(
+            stat_frag_std,
+            input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
+            output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
+            param = {"samples": conf.treatment_bases,
+                     "frag_tool": "macs2"}))
 
     attach_back(workflow, PythonCommand(
         frag_doc,
@@ -1007,7 +1020,7 @@ def _conservation(workflow, conf):
 def _union_DHS_overlap(workflow, conf):
     for i, target in enumerate(conf.treatment_targets):
         if conf.peakcalltool == "hotspot":
-            peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
+            peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed"
             output = target + "_DHS_overlap_peaks_bed"
         elif conf.peakcalltool == "macs2":
             peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"

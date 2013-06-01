@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## sampling by percentage
+## percentage * total_reads = 5M
+
 sam=$1
 prog=$2
 output=$3

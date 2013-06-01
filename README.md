@@ -108,7 +108,7 @@ install picard
 --------------------
 Use picard for SortSam, Markduplicates for both single end and pair end data.
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
-For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R. Fragment size evaluation for PE and SE will be replaced by MACS2.
+For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R. Fragment size evaluation for PE and SE will be replaced by MACS2 in the future.
 
 All default, `2G` memory, `4cpu` will be used.
 
@@ -129,6 +129,12 @@ Built-in modules
 This part is `built-in modules from cistrome-application`.
 include BedIO, FeatIO, Func.
 Export pipeline-scripts/conservation_average.py to $PATH, needs `bx-python`.
+
+
+DHS
+-------
+Merged DHS from ENCODE narrow peaks is used as reference union DHS regions.
+
 
 
 Install latex and jinja2
