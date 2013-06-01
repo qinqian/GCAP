@@ -153,22 +153,27 @@ def DHS_doc(input = {"json": "", "tex": ""}, output = {"latex": ""}, param = {"r
                  "reps": param["reps"]})
     template_dump(DHS_latex)
 
-def reads_doc(input = {"tex": "", "json": ""}, output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": ""}):
+def reads_doc(input = {"tex": "", "json": "", "json_autosome": ""}, output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": ""}):
     """
     these values will be replaced by Jim's codes,
-    currently by bowtie and fastqc
+    currently by bowtie and fastqc,
+    use autosome reads mappable ratio
     """
+    json_au = json_load(input["json_autosome"])["stat"]  ## autosome
     json = json_load(input["json"])["stat"]
 
     ## use correct order
     if param["seq_type"] == "se":
         raw =  [ count_in_million(json[s]["total_reads"]) for s in param["samples"] ]
+        total = sum([json[j]["total_reads"] for j in json])
         mapped_number = [ json[s]["mappable_reads"] for s in param["samples"] ]
     else:
         raw =  [ "%s, %s" % (count_in_million(json[s]["total_reads"]), count_in_million(json[s]["total_reads"])) for s in param["samples"] ]
-        mapped_number = [ json[s]["mappable_reads"] * 2 for s in param["samples"] ]
+        total = sum([json[j]["total_reads"]*2 for j in json])
+        mapped_number = [ json[s]["mappable_reads"]*2 for s in param["samples"] ]
 
-    mapped_rate = [ decimal_to_latex_percent(json[s]["mappable_rate"]) for s in param["samples"] ]
+    ## use autosome ratio
+    mapped_rate = [ decimal_to_latex_percent(json_au[s]) for s in param["samples"] ]
 
     reads_latex = JinjaTemplateCommand(
         template = input['tex'],
@@ -177,8 +182,7 @@ def reads_doc(input = {"tex": "", "json": ""}, output = {"raw": "", "mapping": "
                  "render_dump": output["raw"],
                  "reads": raw,
                  "reps": param["reps"],
-                 "combo": count_in_million(sum([json[j]["total_reads"] for j in json]))})
-
+                 "combo": count_in_million(total)})
     template_dump(reads_latex)
 
     mapping_latex = JinjaTemplateCommand(
@@ -313,24 +317,26 @@ def frag_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"
                  "reps": param["reps"]})
     template_dump(frag_latex)
 
-def stat_peaks(input = {"peaks": {"all": "", "5M": "", "combo": ""}}, output = {"json"}, param = {"tool": ""}):
+def stat_peaks(input = {"peaks": {"all_peaks": "", "5M_spot": "", "combo_peaks": ""}}, output = {"json"}, param = {"tool": "", "samples": ""}):
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}
 
-    json_dict["stat"]["all"] = {}
+    json_dict["stat"]["all_peaks"] = {}
 
-    for a in input["peaks"]["all"]:
+    # d, narrow peaks
+    for a, s in zip(input["peaks"]["all_peaks"], param["samples"]):
         with open(a) as f:
-           json_dict["stat"]["all"][a] = len(f.readlines())
+           json_dict["stat"]["all_peaks"][s] = len(f.readlines())
 
-    json_dict["stat"]["5M"] = {}
+    json_dict["stat"]["5M_spot"] = {}
 
-    for s in input["peaks"]["5M"]:
-        with open(s) as f:
-            json_dict["stat"]["5M"][s] = len(f.readlines())
+    # b, hotspot minimally threshold
+    for spot, sam in zip(input["peaks"]["5M_spot"], param["samples"]):
+        with open(spot) as f:
+            json_dict["stat"]["5M_spot"][sam] = len(f.readlines()[1:])
 
     json_dict["stat"]["combo"] = {}
 
-    if len(input["peaks"]["all"]) >= 2:
+    if len(input["peaks"]["all_peaks"]) >= 2:
         with open(input["peaks"]["combo"]) as combo:
             json_dict["stat"]["combo"]= len(combo.readlines())
     print(json_dict)
@@ -338,19 +344,28 @@ def stat_peaks(input = {"peaks": {"all": "", "5M": "", "combo": ""}}, output = {
     json_dump(json_dict)
 
 def peaks_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"samples": "", "reps": ""}):
+    """ use d peaks( narrow peaks ) for all reads evaluation
+     use b Hotspot for 5M reads evaluation and replicates consistency(correlation and overlap)
+     use 5M narrow peaks for DHS evaluation
+    """
     data = json_load(input["json"])
-    peaks_5M = data["stat"]["5M"].values()
-    peaks_all = data["stat"]["all"].values()
+    peaks_5M = []
+    peaks_all = []
 
-    if "combo" in data["stat"]:
+    for s in param["samples"]:
+        peaks_5M.append(data["stat"]["5M_spot"][s])
 
+    for a in param["samples"]:
+        peaks_all.append(data["stat"]["all_peaks"][a])
+
+    if data["stat"]["combo"]:
         combo = data["stat"]["combo"]
         peaks_latex = JinjaTemplateCommand(
             template = input["tex"],
             name = "peaks_calling",
             param = {"section_name": "peaks_calling",
                      "render_dump": output["latex"],
-                     "peaks_5M": peaks_5M,
+                     "spot_5M": peaks_5M,
                      "peaks_all":peaks_all, "combo": combo,
                      "tool": data["param"]["tool"],
                      "reps": param["reps"]})
@@ -361,12 +376,11 @@ def peaks_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {
             name = "peaks_calling",
             param = {"section_name": "peaks_calling",
                      "render_dump": output["latex"],
-                     "peaks_5M": peaks_5M,
+                     "spot_5M": peaks_5M,
                      "peaks_all": peaks_all,
-                     "tool": data["param"]["tool"]})
+                     "tool": data["param"]["tool"],
+                     "reps": param["reps"]})
     template_dump(peaks_latex)
-
-
 
 def promotor_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"samples": "", "reps": ""}):
 
@@ -443,7 +457,7 @@ def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples
             data = f.read().strip().split("\t")
             no_chrM_tag = data[0]
             total = data[1]
-        json_dict["stat"][s] = round(float(no_chrM_tag) / float(total), 1)
+        json_dict["stat"][s] = round(float(no_chrM_tag) / float(total), 3)
     json_dump(json_dict)
 
 ## summary of library contamination
@@ -614,13 +628,14 @@ def stat_reps(input={"5M_overlap": "", "5M_cor": "", "union": ""},
 
     for rep in input["5M_overlap"]:
         rep_overlap = len(open(rep[0]).readlines())
-        json_dict["stat"]["overlap"][rep[1]] = "%s %s, %s" % (rep[1], rep_overlap, decimal_to_latex_percent(float(rep_overlap) / union_num))
+        json_dict["stat"]["overlap"][rep[1]] = "%s" % (decimal_to_latex_percent(float(rep_overlap) / union_num))
 
     json_dict["stat"]["cor"] = {}
     for rep in input["5M_cor"]:
         with open(rep[0]) as f:
-            rep_cor = f.read().strip().split()[0]
-        json_dict["stat"]["cor"][rep[1]] = "%s %s" % (rep[1], rep_cor)
+            rep_cor = f.read().strip().split()[2]
+
+        json_dict["stat"]["cor"][rep[1]] = "%s" % rep_cor
 
     json_dump(json_dict)
 
@@ -637,8 +652,6 @@ def reps_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {}
     for i in overlap:
         overlap_d.append(overlap[i])
 
-    print(overlap_d)
-    print(cor_d)
 
     rep_latex = JinjaTemplateCommand(
         template = input["tex"],

@@ -37,7 +37,60 @@ NOTE:
 	*-both-passes/*.twopass.merge150.wgt10.zgt2.wig minimally thresholded hotspots
 	*-both-passes/*.hotspot.twopass.fdr0.05.merge.[wig/bed] FDR thresholded hotspots
 
-	Use two pass hotspot and peaks merge files, that is `*-both-passes/*.hotspot.twopass.fdr0.01.merge.pks.bed` as peaks
+	take the encode 2 mouse data as an example.
+	
+	The following encode_mouse_treat_rep1 is the prefix.
+	a.  This is top 10 of the loose hotspot regions encode_mouse_treat_rep1.hotspot.twopass.zscore.wig( totally 303941 regions ), which is used for SPOT score calculation.chr1    3322171 3322200 2.148710
+	chr1    3346446 3346569 2.896090
+	chr1    3359049 3359208 3.776190
+	chr1    3360959 3361032 2.148710
+	chr1    3406163 3406545 33.391200
+	chr1    3406686 3406964 2.148710
+	chr1    3407779 3407880 2.148710
+	chr1    3412749 3412880 2.148710
+	chr1    3413164 3413314 2.773560
+	chr1    3415304 3415416 2.258360
+	
+	b. This is top 10 of `hotspot peaks` regions(Hotspot, broad peaks) encode_mouse_treat_rep1.twopass.merge150.wgt10.zgt2.wig
+	so-called minimally thresholded hotspots ( totally 197552 regions )
+	chr1    3322171 3322200 2.148710
+	chr1    3346446 3346569 2.896090
+	chr1    3359049 3359208 3.776190
+	chr1    3360959 3361032 2.148710
+	chr1    3406163 3406964 33.391200
+	chr1    3407779 3407880 2.148710
+	chr1    3412749 3412880 2.148710
+	chr1    3413164 3413314 2.773560
+	chr1    3415304 3415416 2.258360
+	chr1    3427261 3427386 2.938350
+	
+	c. This  is the top ten of two passes hotspot regions with fdr 0.01 
+	encode_mouse_treat_rep1.hotspot.twopass.fdr0.01.bed ( totally 162840 regions ), so called FDR thresholded hotspots.
+	chr1    3406163 3406545 33.3912
+	chr1    3445667 3445915 8.39721
+	chr1    3467832 3468094 12.7712
+	chr1    3504561 3504909 106.159
+	chr1    3504916 3505327 192.588
+	chr1    3505337 3505540 44.0136
+	chr1    3505610 3505694 8.31948
+	chr1    3541336 3541619 7.77236
+	chr1    3541699 3541978 5.27296
+	chr1    3542027 3542248 9.02206
+	
+	d. If wavelets peaks is so little that chromosome check is not True, above c will be copied to d.(Peaks, narrow peaks)
+	This is the top 10 of merged wavelets peaks and hotspot regions with fdr 0.01
+	encode_mouse_treat_rep1.hotspot.twopass.fdr0.01.merge.pks.bed ( totally 122532 regions, the most strict one, this is what I choose as final peaks number ), so called FDR thresholded peaks.
+	chr1    3406300 3406450 .       36.406250
+	chr1    3445740 3445890 .       8.953125
+	chr1    3467860 3468010 .       14.734375
+	chr1    3505040 3505190 .       194.953125
+	chr1    3541480 3541630 .       8.593750
+	chr1    3542020 3542170 .       9.250000
+	chr1    3543180 3543330 .       25.515625
+	chr1    3576620 3576770 .       16.453125
+	chr1    3595820 3595970 .       47.406250
+	chr1    3601420 3601570 .       9.750000
+
 	
 
 install bedops and bedtools
@@ -55,7 +108,9 @@ install picard
 --------------------
 Use picard for SortSam, Markduplicates for both single end and pair end data.
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
-For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R.
+For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R. Fragment size evaluation for PE and SE will be replaced by MACS2.
+
+All default, `2G` memory, `4cpu` will be used.
 
 ----
 
@@ -63,15 +118,17 @@ install UCSC component
 -------------------------
 *Site* <http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/>
 `BedClip` is used to remove outlier chromosome locations.
-`bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle
+`bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle.
 
-With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH) for replicates consistency evaluation on union peaks regions.
+
+With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union peaks regions.
 
 
 Built-in modules
 -------------------
 This part is `built-in modules from cistrome-application`.
-include BedIO, FeatIO, Func
+include BedIO, FeatIO, Func.
+Export pipeline-scripts/conservation_average.py to $PATH, needs `bx-python`.
 
 
 Install latex and jinja2
@@ -182,27 +239,24 @@ resume process when problems occurs:
 Prototype  Features
 ======================
 
-1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa)
-
-2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2, sampling by Picard)
-
-3. peaks calling on combo of all reads and 5M sampled reads
-4. estimate library complexity/redundancy (picard, this will be replaced by Consensus)
-
-4. estimates SPOT score for 5M reads (Hotspot)
-
-5. estimate replicates consistency by using 5M sampled data union peaks by bigwiggle and by peaks regions overlap(bedtools and wigCorrelate)
-
-6. calculate peaks promotor percentage and compare with genome promotor percentage for 5M reads(built-in script)
-
-7. calculate Phastcon score of top 1000 non-promotor peaks regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
-
-8. estimate peaks overlap with DHS on replicates and combo by 5M reads(bedops)
+1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
+2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(not config yet), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling will replaced by macs2 sample -n 5000000, macs2 needs to support pair end sampling)
+3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
+4. peaks calling on combo of all reads and 5M sampled reads, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
+5. estimate library complexity/redundancy by 5M reads(picard, Markduplicates)
+6. estimates SPOT score for 5M reads (Hotspot, a)
+7. estimate replicates consistency by
+	1. BigWiggle Correlation on 5M sampled data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
+    2. Overlap by hotspot(Hotspot, b) regions overlap from 5M reads(Intersection over Union regions, bedtools)
+    
+8. This has been removed, calculate hotspot(filtered Hotspot, b) promotor percentage and compare with genome promotor percentage for 5M reads Hotspot(b) regions(built-in script)
+9. calculate Phastcon score of top 1000 non-promotor Hotspot(filtered Hotspot, b)regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
+10. estimate (narrow peaks, d) overlap with ENCODE narrow peaks union DHS on replicates of 5M reads(bedtools)
 
 Optionally
 ===========
 
-Install MACS2 for optional peaks caller: 
+Install MACS2 for optional peaks caller and fragment size estimating: 
 
 	git clone https://github.com/taoliu/MACS/
 	or 

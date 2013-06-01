@@ -300,7 +300,7 @@ def _reads_mapping(workflow, conf):
     ## raw reads and reads mapping qc
     attach_back(workflow, PythonCommand(
             reads_doc,
-            input = {"tex": tex, "json": conf.json_prefix + "_mapping.json"},
+            input = {"tex": tex, "json": conf.json_prefix + "_mapping.json", "json_autosome": conf.json_prefix + "_um_autosome.json"},
             output = {"raw": conf.latex_prefix + "raw.tex",
                       "mapping": conf.latex_prefix + "mapping.tex"},
             param = {"seq_type": conf.seq_type,
@@ -315,6 +315,8 @@ def _library_complexity(workflow, conf):
     ## sampling 5M from all reads mapping sam files using picard
 
     _sample_reads(workflow, conf, 5000000, "sam")
+
+
 
     # picard markduplicates need SortSam
     for target in conf.treatment_targets:
@@ -356,6 +358,17 @@ def _fragment_size(workflow, conf):
     Use picard for PE mode temporarily
     Use macs2 for SE mode, bug: several fragment sizes available
     """
+
+#    if conf.seq_type == "pe":
+#        for target in conf.treatment_targets:
+#            insert_size = attach_back(workflow, ShellCommand(
+#                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
+#                tool = "java",
+#                input = {"bam": target + "_picard_sort.bam.5M"},
+#                output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
+#                param = {"threads": 4}))
+#            insert_size.update(param = conf.items("picard"))
+
     for target in conf.treatment_targets:
         fragment_size = attach_back(workflow, ShellCommand(
                                 "{tool} predictd -i {input[bam]} --rfile {param[prefix]}",
@@ -452,6 +465,7 @@ def _hotspot_on_replicates(workflow, conf):
             output = {"dir": conf.target_dir,
                       "spot_peaks_combined": conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
                       "density_starch": target + "_5M.tagdensity.bed.starch",
+                      "hotspot":  conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig",
                       "spot": target + "_5M.spot.out"},
             param = None))
 
@@ -494,8 +508,8 @@ def _peaks_reps_preprocess(workflow, conf):
         ## remove blacklist for human
         ## mouse no blacklist ??
         if conf.peakcalltool == "hotspot":
-            input_peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed"
-            non_velcro = target + "_5M_velcro_non_overlap_peaks.bed"
+            input_peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig"
+            non_velcro = target + "_5M_velcro_non_overlap_hotspot.bed"
         elif conf.peakcalltool == "macs2":
             input_peaks = target + "_5M_macs2_peaks.bed"
             non_velcro = target + "_5M_macs2_velcro_non_overlap_peaks.bed"
@@ -545,8 +559,8 @@ def _peaks_reps_evaluating(workflow, conf):
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):
             if conf.peakcalltool == "hotspot":
-                one_rep = conf.treatment_targets[i] + "_5M_velcro_non_overlap_peaks.bed.final"
-                another_rep = conf.treatment_targets[j] + "_5M_velcro_non_overlap_peaks.bed.final"
+                one_rep = conf.treatment_targets[i] + "_5M_velcro_non_overlap_hotspot.bed.final"
+                another_rep = conf.treatment_targets[j] + "_5M_velcro_non_overlap_hotspot.bed.final"
             elif conf.peakcalltool == "macs2":
                 one_rep = conf.treatment_targets[i] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
                 another_rep =  conf.treatment_targets[j] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
@@ -564,23 +578,23 @@ def _peaks_reps_evaluating(workflow, conf):
     bed_merge = attach_back(workflow, ShellCommand(
             "cat {param[reps]} | sort-bed - | {tool} -m - > {output}",
             tool = "bedops",
-            input = {"reps": [ target + "_5M_velcro_non_overlap_peaks.bed.final" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+            input = {"reps": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
                                for target in conf.treatment_targets ]},
             output = conf.prefix + "_5M_reps_union.bed"))
     bed_merge.param.update({"reps": " ".join(bed_merge.input["reps"])})
 
     ## Implemented by Jim, correlation on union regions
-    ## bigWigCorrelate_2 -restrict=testid_reps_union_region.bb testid_treat_rep1_5M.bw testid_treat_rep2_5M.bw
+    ## bigWigCorrelate -restrict=testid_reps_union_region.bb testid_treat_rep1_5M.bw testid_treat_rep2_5M.bw
     ## if you want genome wide correlation, use wigCorrelate
     union = conf.prefix + "_5M_reps_union.bed"
     bed_clip = attach_back(workflow,
         ShellCommand(
-            template="{tool} {input} {param[chrom_len]} {output}",
+            template="{tool} {input} {param[chrom_len]} {output[union]} && bedToBigBed {output[union]} {param[chrom_len]} {output[bb]}",
             tool="bedClip",
             input=union,
-            output =union + ".filter",
-            param={'chrom_len': conf.get_path("lib", "chrom_len")},
-                  name="bedclip filter"))
+            output ={"union": union + ".filter", "bb": union + ".bigbed"},
+            param = {"chrom_len": conf.get_path("lib", "chrom_len")},
+            name="bedclip filter"))
 
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):
@@ -591,18 +605,16 @@ def _peaks_reps_evaluating(workflow, conf):
                 one_rep = conf.treatment_targets[i] + "_5M.bw"
                 another_rep = conf.treatment_targets[j] + "_5M.bw"
 
-
             attach_back(workflow,
                 ShellCommand(
-                    "bedToBigBed {input[union]} {param[chrom_bed]} {output[bb]} && {tool} -restrict={output[bb]} {input[one_rep]} {input[another_rep]} 1>{output[cor_score]}",
+                    "{tool} -restrict={input[union]} {input[one_rep]} {input[another_rep]} 1>{output[cor_score]}",
                     tool="bigWigCorrelate",
                     input = {"one_rep": one_rep,
                              "another_rep": another_rep,
-                             "union": union + ".filter"},
-                    output= {"cor_score": conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score",
-                             "bb": conf.treatment_targets[i] + ".bigbed"},
+                             "union": union + ".bigbed"},
+                    output= {"cor_score": conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score"},
                     name = "replicates bigwiggle correlation",
-                    param = {"chrom_bed": conf.get_path("lib", "chrom_len")}))
+                    param = None))
 
     ## peaks replicates json
     bed = [ (conf.treatment_targets[i] + "_reps_overlap_" + "rep" + str(i+1) + "rep" + str(j+1) + ".bed", "Rep %s %s" %(i + 1, j + 1))
@@ -623,6 +635,7 @@ def _peaks_reps_evaluating(workflow, conf):
         input = {"json": conf.json_prefix + "_reps.json", "tex": tex},
         output = {"latex": conf.latex_prefix + "_reps.tex"},
         param = {"samples": conf.treatment_bases}))
+
 
 def _hotspot_combo(workflow, conf):
     ## starchcat all replicates
@@ -808,42 +821,44 @@ def _peaks_calling_latex(workflow, conf):
 
             attach_back(workflow, PythonCommand(
                     stat_peaks,
-                    input = {"peaks": {"5M": [ conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ],
-                                       "all": [ conf.hotspot_reps_both_passes_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ],
+                    input = {"peaks": {"5M_spot": [ conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig" for i in range(len(conf.treatment_pairs)) ],
+                                       "all_peaks": [ conf.hotspot_reps_both_passes_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ],
                                        "combo": conf.hotspot_merge_both_passes_prefix + "_merge_all.hotspot.twopass.fdr0.01.merge.pks.bed" }},
                     output = {"json": conf.json_prefix + "_peaks.json"},
-                    param = {"tool": conf.peakcalltool}))
+                    param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases},
+                    name = "json peaks and hotspot"))
         else:
             attach_back(workflow, PythonCommand(
                     stat_peaks,
-                    input = {"peaks": {"5M": [ conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ],
-                                       "all": [ conf.hotspot_reps_both_passes_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ]}},
+                    input = {"peaks": {"5M_spot": [ conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig" for i in range(len(conf.treatment_pairs)) ],
+                                       "all_peaks": [ conf.hotspot_reps_both_passes_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" for i in range(len(conf.treatment_pairs)) ]}},
                     output = {"json": conf.json_prefix + "_peaks.json"},
-                    param = {"tool": conf.peakcalltool}))
+                    param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases},
+                    name = "json peaks and hotspot"))
 
     elif conf.peakcalltool == "macs2":
         if len(conf.treatment_pairs) >= 2:
             attach_back(workflow, PythonCommand(
                     stat_peaks,
-                    input = {"peaks": {"all": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
-                                       "5M": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ],
+                    input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
+                                       "5M_spot": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ],
                                        "combo": conf.prefix + "_peaks.bed"}},
                     output = {"json": conf.json_prefix + "_peaks.json"},
-                    param = {"tool": conf.peakcalltool}))
+                    param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
         else:
             attach_back(workflow, PythonCommand(
                     stat_peaks,
-                    input = {"peaks": {"all": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
-                                       "5M": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ]}},
+                    input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
+                                       "5M_spot": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ]}},
                     output = {"json": conf.json_prefix + "_peaks.json"},
-                    param = {"tool": conf.peakcalltool}))
+                    param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
 
     ## peaks number latex
     attach_back(workflow, PythonCommand(
         peaks_doc,
         input = {"tex": tex, "json": conf.json_prefix + "_peaks.json"},
         output = {"latex": conf.latex_prefix + "_peaks.tex"},
-        param = {"reps": len(conf.treatment_pairs)},
+        param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases},
         name = "peaks number json"))
 
     ## 5M reads, calculate the merged two passes and peaks regions number
@@ -891,7 +906,7 @@ def _promoter_overlap(workflow, conf):
     ## peaks region evaluation
     for i, target in enumerate(conf.treatment_targets):
         if conf.peakcalltool == "hotspot":
-            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+            peaks = target + "_5M_velcro_non_overlap_hotspot.bed.final"
         elif conf.peakcalltool == "macs2":
             peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
         attach_back(workflow,
@@ -922,8 +937,7 @@ def _promoter_overlap(workflow, conf):
                  "promotor": conf.prefix + "_promotor.count",
                  "mappable": conf.get("hotspot", "mappable_region")},
         output = {"json": conf.json_prefix + "_promotor.json"},
-        param = {"samples": conf.treatment_bases}
-    ))
+        param = {"samples": conf.treatment_bases}))
 
     ## promotor latex document
     attach_back(workflow, PythonCommand(
@@ -939,7 +953,7 @@ def _conservation(workflow, conf):
     for target in conf.treatment_targets:
         ## get non-promotor peaks regions
         if conf.peakcalltool == "hotspot":
-            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+            peaks = target + "_5M_velcro_non_overlap_hotspot.bed.final"
             non_promotor = target + "_5M_non-promotor_peaks_bed"
             phascon = target + "_100bp_phastcon.score"
         elif conf.peakcalltool == "macs2":
@@ -991,9 +1005,9 @@ def _conservation(workflow, conf):
                      "sample": conf.treatment_bases}))
 
 def _union_DHS_overlap(workflow, conf):
-    for target in conf.treatment_targets:
+    for i, target in enumerate(conf.treatment_targets):
         if conf.peakcalltool == "hotspot":
-            peaks = target + "_5M_velcro_non_overlap_peaks.bed.final"
+            peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
             output = target + "_DHS_overlap_peaks_bed"
         elif conf.peakcalltool == "macs2":
             peaks = target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
@@ -1006,7 +1020,7 @@ def _union_DHS_overlap(workflow, conf):
                 tool="intersectBed",
                 input={"pks_spot_bed": peaks,
                        "DHS_peaks_bed": conf.get("lib", "dhs")},
-                output=output,
+                output = output,
                 name = "Write out DHS overlap BED",
                 param = None))
 
@@ -1014,8 +1028,8 @@ def _union_DHS_overlap(workflow, conf):
         stat_dhs,
         input={"dhs_peaks": [ target + "_DHS_overlap_peaks_bed" if conf.peakcalltool == "hotspot" else target + "_macs2_DHS_overlap_peaks_bed"
                             for target in conf.treatment_targets ],
-               "pks_spot_bed": [ target + "_5M_velcro_non_overlap_peaks.bed.final" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
-                                for target in conf.treatment_targets ]},
+               "pks_spot_bed": [ conf.hotspot_reps_both_passes_5M_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+                                for i, target in enumerate(conf.treatment_targets) ]},
         output = {"json": conf.json_prefix + "_dhs.json"},
         param= {"samples":conf.treatment_bases},
         name="DHS summary"))
@@ -1062,7 +1076,6 @@ def report(workflow, conf):
     collector.append(conf.latex_prefix + "_dhs.tex")
     collector.append(conf.latex_prefix + "_table_end.tex")
     collector.append(conf.latex_prefix + "_doc_end.tex")
-    print(collector)
 
     integrate_doc = attach_back(workflow, ShellCommand(
             "cat {param[input]} > {output[tex]} && {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}\

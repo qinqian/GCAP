@@ -1,5 +1,4 @@
-#!/opt/bin/python
-# Time-stamp: <2011-07-15 21:12:20 Jian Ma>
+#!/usr/bin/env python2.7
 
 """
 Copyright (c) 2008 Tao Liu <taoliu@jimmy.harvard.edu>

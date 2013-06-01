@@ -120,15 +120,16 @@
 %- if section_name == "peaks_calling"
   \midrule
 %- if reps >= 2
-  Peak Calls Sample(5M) & \VAR{tool} FDR 0.01 & \VAR{peaks_5M | join(' & ')} & \\
+  Peak Calls Sample(5M) & Hotspot & \VAR{spot_5M | join(' & ')} & \\
 %- else
-  Peak Calls Sample(5M) & \VAR{tool} FDR 0.01 & \VAR{peaks_5M | join(' & ')}  \\
+  Peak Calls Sample(5M) & Hotspot & \VAR{spot_5M | join(' & ')}  \\
 %- endif
-  \midrule
+
+ \midrule
 %- if reps >= 2
-  Peak Calls Combo(All) & \VAR{tool} FDR 0.01 & \VAR{peaks_all | join(' & ')} & \VAR{combo}\\
+ Peak Calls Combo(All) & Peaks FDR 1\% & \VAR{peaks_all | join(' & ')} & \VAR{combo}\\
 %- else
-  Peak Calls Combo(All) & \VAR{tool} FDR 0.01 & \VAR{peaks_all | join(' & ')}  \\
+ Peak Calls Combo(All) & Peaks FDR 1\% & \VAR{peaks_all | join(' & ')}  \\
 %- endif
 %- endif
 
@@ -149,14 +150,15 @@
   Rep Wig Corr in Union Peaks (5M) & $>$0.75 & \multicolumn{3}{c}{\VAR{cor | join(' ; ')}} \\
 %- endif
 
-%- if section_name == "promotor"
-  \midrule
-%- if reps >= 2
-  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} & \\
-%- else
-  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} \\
-%- endif
-%- endif
+%# no promotor any more
+%# %- if section_name == "promotor"
+%#  \midrule
+%# %- if reps >= 2
+%#  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} & \\
+%# %- else
+%#  Promotor \%(5M)  & $<$20\% (genome: \VAR{genome}) & \VAR{promotor | join(' & ')} \\
+%# %- endif
+%# %- endif
 
 %- if section_name == "conservation"
   \midrule
