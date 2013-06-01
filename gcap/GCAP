@@ -373,7 +373,7 @@ def _fragment_size(workflow, conf):
 
         attach_back(workflow, PythonCommand(
             stat_frag_std,
-            input = {"insert": [ target + "_insert_metric.5M" ]},
+            input = {"insert": [ target + "_insert_metric.5M" for target in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_frag.json"},
             param = {"samples": conf.treatment_bases,
                      "frag_tool": "picard"}))

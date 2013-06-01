@@ -300,13 +300,15 @@ def stat_frag_std(input = {"r": "", "insert": ""}, output = {"json": "", "r": ""
 
             std = os.popen("Rscript %s" % rout).read().strip()
             json_dict["stat"][s] = "mean %s, sd %s" % (max(map(int, values["frag"])), int(float(std)))
-        json_dump(json_dict)
 
     elif param["frag_tool"] == "picard":
         for i, s in zip(input["insert"], param["samples"]):
             with open(i, "rU") as dup:
                 data = dup.readlines()[7]
+                # print(data.split("\t")[4])
+                # print(data.split("\t")[5])
             json_dict["stat"][s] = str(int(float(data[4]))) + ", sd " + str(int(float(data[5])))
+    json_dump(json_dict)
 
 def frag_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"reps": "", "samples": ""}):
 
@@ -640,7 +642,7 @@ def stat_reps(input={"5M_overlap": "", "5M_cor": "", "union": ""},
     json_dict["stat"]["cor"] = {}
     for rep in input["5M_cor"]:
         with open(rep[0]) as f:
-            rep_cor = f.read().strip().split()[2]
+            rep_cor = f.read().strip().split()[0]
 
         json_dict["stat"]["cor"][rep[1]] = "%s" % rep_cor
 
