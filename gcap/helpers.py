@@ -307,6 +307,7 @@ def stat_frag_std(input = {"r": "", "insert": ""}, output = {"json": "", "r": ""
                 data = dup.readlines()[7]
                 # print(data.split("\t")[4])
                 # print(data.split("\t")[5])
+            data = data.strip().split("\t")
             json_dict["stat"][s] = str(int(float(data[4]))) + ", sd " + str(int(float(data[5])))
     json_dump(json_dict)
 
@@ -455,6 +456,27 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fha.close()
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
+
+def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both"}):
+    num_lines = sum(1 for _ in open(input["sam"]))
+
+    header_num = 0
+    with open(input["sam"]) as f:
+        for line in f:
+            if line.startswith("@"):
+                header_num += 1
+            break
+
+    rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
+
+    cur_num = -1
+    with open(output["sam_sample"], "w") as fout:
+        with open(input["sam"], "rU") as fin:
+            for rand_num in rand_nums:
+                while cur_num < rand_num:
+                    fin.readline()
+                    cur_num+=1
+                fout.write(fin.readline())
 
 def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples": ""}):
     """
@@ -654,7 +676,7 @@ def reps_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {}
     cor = data['stat']["cor"]
     cor_d = []
     for i in cor:
-        cor_d.append(cor[i])
+        cor_d.append(str(round(float(cor[i]), 2)))
 
     overlap = data["stat"]["overlap"]
     overlap_d = []

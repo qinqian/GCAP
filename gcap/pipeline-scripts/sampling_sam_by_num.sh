@@ -17,4 +17,4 @@ echo $percent
 echo $prog
 echo $output
 
-java -Xmx2g -XX:ParallelGCThreads=4 -jar $prog I=$sam O=$output P=$percent VALIDATION_STRINGENCY=SILENT
+java -Xmx4g -XX:-UseGCOverheadLimit  -XX:ParallelGCThreads=4 -jar $prog I=$sam O=$output P=$percent VALIDATION_STRINGENCY=SILENT

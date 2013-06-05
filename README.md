@@ -1,5 +1,7 @@
 ## What is GCAP
 > `G`lobal `C`hromatin `A`ccessibility `P`ipeline
+> Dnase, Bnase, Cnase的pipeline
+
 
 Install 
 =============
@@ -30,6 +32,7 @@ install Hotspot
 * Download `CHROM FILE` and `_MAPPABLE_FILE_` for your species and reads length
 * Extract default SPOT output of Hotspot v3
 
+No matter it's SE or PE data, we take 5' tags for hotspot peaks calling.
 
 NOTE: 
 	
@@ -130,6 +133,14 @@ This part is `built-in modules from cistrome-application`.
 include BedIO, FeatIO, Func.
 Export pipeline-scripts/conservation_average.py to $PATH, needs `bx-python`.
 
+Three modes of sampling:
+
+- We use built-in function to do raw reads sampling from PE and SE FASTQ.
+- Python function to sample reads from PE and SE SAM files， including `mappable and unmappable reads`.
+- picard sampling for PE and SE SAM files. (May use many threads and memory)
+
+We decide to use built-in to sample 5M mappable and unmappable reads from PE and SE SAM files and both transfer to hospot as single end data.
+
 
 DHS
 -------
@@ -156,6 +167,12 @@ refer to static/GCAP_pe.conf for pair end data, static/GCAP_se.conf for single e
 
 If input is single end data, use `,` to separate replicates files.
 If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
+
+`Input Format`
+Only support fastq files now, bam files and reads bed files support will be added later.
+
+`Keep duplicate`
+is an important option for peaks calling. You could customize it by python conf files.
 
 instructions on conf files:
 	
@@ -200,6 +217,7 @@ instructions on conf files:
 	[hotspot]
 	chrom_info = chromosome_info   ## from hotspot website	
 	mappable_region = path  ## this is downloaded from hotspot website, it's a necessary part for evaluating genomic promotor percentage
+	keep_dup = T            ## duplicates or not
 	
 	## if your peak caller is macs2	, fill the following parameters
 	[macs]

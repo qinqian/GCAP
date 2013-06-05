@@ -87,15 +87,25 @@ def _sample_reads(workflow, conf, N, format):
 
     elif format == "sam":
         for target, s in zip(conf.treatment_targets, conf.treatment_bases):
-            attach_back(workflow, ShellCommand(
-               "{tool} {input[sam]} {param[prog]} {output[bam]}",
-                tool = "sampling_sam_by_num.sh",
-                input = {"sam": target + ".sam.all"},
-                output = {"bam": target + ".sam.%s" % suffix},
-                param = {"prog": conf.get("picard", "sample")}))
 
-        ## macs2 sampling 5M mappable reads, can't be apply to pair end sampling, output bed files
-        # macs2 randsample -t file -n 5000000
+            ## picard sampling
+            if "sample" in dict(conf.items("picard")): ## comment or not in conf
+                ## calculate reads number and sampling by 5M / total using picard
+                attach_back(workflow, ShellCommand(
+                   "{tool} {input[sam]} {param[prog]} {output[bam]}",
+                    tool = "sampling_sam_by_num.sh",
+                    input = {"sam": target + ".sam.all"},
+                    output = {"bam": target + ".sam.%s" % suffix},
+                    param = {"prog": conf.get("picard", "sample")}))
+
+            ## built-in sampling
+            else:
+                attach_back(workflow, PythonCommand(
+                    sampling_sam,
+                    input = {"sam": target + ".sam.all"},
+                    output = {"sam_sample": target + ".sam.%s" % suffix},
+                    param = {"random_number": N,
+                             "map_or_unmap": "both"}))
 
 def _fastqc(workflow, conf):
     """
@@ -270,13 +280,23 @@ def _bowtie(workflow, conf):
 
 ## optionally
 def _bwa(workflow, conf):
-    """bwa aln /homea6/qinqian/lib/hg19.fa HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R1_001.fastq > HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R1_001.sai"""
+    """bwa genome fasta genome index"""
     for target in conf.sample_targets:
-        attach_back(workflow, ShellCommand(
-            "{tool} aln {input[index]} {input[fastq]} > {output[sai]}",
-            tool = "bwa",
-            input = {"index": conf.get("lib", "genome_index"), "fastq": conf.sample_targets}))
+        if conf.seq_type == "pe":
+            attach_back(workflow, ShellCommand(
+                "{tool} aln {input[index]} {input[fastq]} > {output[sai]}",
+                tool = "bwa",
+                input = {"index": conf.get("lib", "genome_index"),
+                         "fastq": conf.sample_targets},
+                output = "",
+                param = ""))
 
+        elif conf.seq_type == "se":
+            attach_back(workflow, ShellCommand(
+                "{tool} aln {input[index]} {input[fastq]} > {output[sai]}",
+                tool = "bwa",
+                input = {},
+                output = {}))
 
 def _reads_mapping(workflow, conf):
     """
@@ -317,6 +337,7 @@ def _library_complexity(workflow, conf):
     """
     ## sampling 5M from all reads mapping sam files using picard
 
+    ## choose sampling modes
     _sample_reads(workflow, conf, 5000000, "sam")
 
     # picard markduplicates need SortSam
