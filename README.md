@@ -172,7 +172,8 @@ If input is pair end data, use `,` to separate pairs, `;` to separate replicates
 Only support fastq files now, bam files and reads bed files support will be added later.
 
 `Keep duplicate`
-is an important option for peaks calling. You could customize it by python conf files.
+is an important option for peaks calling. You could customize it by python conf files. To keep duplicates tags,
+just `keep_dup = T` in `[hotspot]`.
 
 instructions on conf files:
 	
@@ -186,7 +187,7 @@ instructions on conf files:
 	read_length = 50
 	
 	[tool]
-	mapping = bowtie ## or bwa, not finish yet
+	mapping = bowtie ## or bwa, for reads mapping
 	peak_calling = hotspot ## or macs2, finish
 	
 	[picard]
@@ -195,8 +196,7 @@ instructions on conf files:
 	threads = 4    
 	sample = path	 ## DownsampleSam.jar path
 	
-	[contaminate]    ## for library contamination evaluation, bowtie or bwa index
-	hg19 = /mnt/Storage/data/Bowtie/hg19
+	[contaminate]    ## for library contamination evaluation, use bowtie for fast assessment only	hg19 = /mnt/Storage/data/Bowtie/hg19
 	mm9 = /mnt/Storage/data/Bowtie/mm9
 	rn4 = /mnt/Storage/home/qinq/projects/chilin/rn4_index/rn4
 	
@@ -207,7 +207,7 @@ instructions on conf files:
 	max_aign = 1  ## keep unique mappable reads or not
 	
 	[lib] ## external data
-	genome_index = /mnt/Storage/data/Bowtie/hg19                                       ## bowtie or bwa index
+	genome_index = /mnt/Storage/data/Bowtie/hg19                                       ## bowtie or bwa index 
 	chrom_bed =  /mnt/Storage/home/qinq/lib/chr_limit_hg19.bed                         ## chromosome limitation BED file
 	dhs = /mnt/Storage/data/DHS/DHS_hg19.bed                                           ## union DHS sites
 	velcro = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed ## black list
@@ -233,30 +233,37 @@ for human should be the data contained in the static/hg19.refgene.tss, which is 
 
 only print command line: 
 
-	GCAP.py run -c GCAP_se.conf
+	GCAP run -c GCAP_se.conf
 
 * real run
 
 run with real data: 
 
-	GCAP.py run -c GCAP_pe.conf
+	GCAP run -c GCAP_pe.conf
 
 * resume
 
 resume process when problems occurs:
 
-	GCAP.py run -c GCAP_pe.conf --resume
+	GCAP run -c GCAP_pe.conf --resume
 
 
 * Step control
 
 	- skip steps:
 
-    		GCAP.py run -c GCAP_pe.conf --skip 9 --resume
+    		GCAP run -c GCAP_pe.conf --skip 9 --resume
 
 	- from and to:
 	
-		   	GCAP.py run -c GCAP_pe.conf --from 1 --to 3 --resume
+		   	GCAP run -c GCAP_pe.conf --from 1 --to 3 --resume
+		   	
+* clean up and purge
+  to remove temporary files, only keep QC report, bigwiggle, peaks, hotspot and bam files, json and latex files:
+  
+  		GCAP clean -c GCAP_pe.conf
+  		GCAP purge -c GCAP_pe.conf
+
 
 ----
 
@@ -264,11 +271,11 @@ Prototype  Features
 ======================
 
 1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
-2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(not config yet), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling will replaced by macs2 sample -n 5000000, macs2 needs to support pair end sampling)
+2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
 3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
-4. peaks calling on combo of all reads and 5M sampled reads, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
+4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
 5. estimate library complexity/redundancy by 5M reads(picard, Markduplicates)
-6. estimates SPOT score for 5M reads (Hotspot, a)
+6. estimates SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
 7. estimate replicates consistency by
 	1. BigWiggle Correlation on 5M sampled data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
     2. Overlap by hotspot(Hotspot, b) regions overlap from 5M reads(Intersection over Union regions, bedtools)
@@ -280,12 +287,14 @@ Prototype  Features
 Optionally
 ===========
 
-Install MACS2 for optional peaks caller and fragment size estimating: 
+Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating: 
 
 	git clone https://github.com/taoliu/MACS/
 	or 
 	pip install MACS2
-	
-Install bwa for optional reads mapping tool.
+
+`Add MACS2 SPOT score calculation, much stringent than Hotspot spot score.`
+
+Install bwa for optional reads mapping tool. 
 
 ![QC report](example.png)

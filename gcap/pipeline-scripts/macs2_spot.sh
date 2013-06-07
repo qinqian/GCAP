@@ -3,32 +3,32 @@
 #########################################################
 #
 # Compute SPOT (Signal Portion Of Tags) metric for MACS2
-#
+# A little strange
 #########################################################
 
-if [ $# -lt 3 ];then
-    echo `basename $0` "can run hotspot pipeline v3 in batch"
-    echo "Need 1 parameters now: <bam_file> <tags_file> <sequence_type>"
+if [ $# -lt 2 ];then
+    echo `basename $0` "calculate MACS2 SPOT score"
+    echo "Need 1 parameters now: <tags bed starch file> <peaks bed file>"
     exit 1
 fi
 
-## Not finish
-
-tags=_TAGS_
-outdir=_OUTDIR_
+tags=$1
+peaks=$2
 
 thisscr="macs2_spot.sh"
 echo
 echo $thisscr
 
-proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
-tagb=$outdir/$proj.bed.starch
-ntag=`cut -d" " -f2 $outdir/$proj-pass1/*.stdout`
-hot=$outdir/$proj-both-passes/$proj.hotspot.twopass.zscore.wig
-out=$outdir/$proj.spot.out
-tih=$(unstarch $tagb | bedops --header -e -1 - $hot | wc -l)
+ntag=`unstarch $tags | wc -l | cut -d" " -f2`
+
+out=${peaks}.spot.out
+
+tih=$(unstarch $tags | bedops -e -1 - $peaks | wc -l)
+
 spot=$(echo "scale=4; $tih/$ntag" | bc)
+
 echo "tih = $tih"
 echo "SPOT = $spot"
-printf "%12s  %12s  %6s\n" "total tags" "hotspot tags" "SPOT" > $out
+
+printf "%12s  %12s  %6s\n" "total tags" "MACS2 tags" "SPOT" > $out
 printf "%12d  %12d  %.4f\n" $ntag $tih $spot >> $out

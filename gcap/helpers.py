@@ -153,28 +153,31 @@ def DHS_doc(input = {"json": "", "tex": ""}, output = {"latex": ""}, param = {"r
                  "reps": param["reps"]})
     template_dump(DHS_latex)
 
-def reads_doc(input = {"tex": "", "json": "", "json_autosome": ""}, output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": ""}):
+def reads_doc(input = {"tex": "", #"json": "",
+                       "json_autosome": ""},
+              output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": ""}):
     """
     these values will be replaced by Jim's codes,
     currently by bowtie and fastqc,
     use autosome reads mappable ratio
     """
     json_au = json_load(input["json_autosome"])["stat"]  ## autosome
-    json = json_load(input["json"])["stat"]
-
+    ## json = json_load(input["json"])["stat"]
     ## use correct order
+
     if param["seq_type"] == "se":
-        raw =  [ count_in_million(json[s]["total_reads"]) for s in param["samples"] ]
-        total = sum([json[j]["total_reads"] for j in json])
-        mapped_number = [ json[s]["mappable_reads"] for s in param["samples"] ]
+        raw =  [ count_in_million(json_au[s]["total"]) for s in param["samples"] ]
+        total = sum([int(json_au[j]["total"]) for j in json_au])
+        mapped_number = [ int(json_au[s]["map"]) for s in param["samples"] ]
     else:
-        raw =  [ "%s, %s" % (count_in_million(json[s]["total_reads"]), count_in_million(json[s]["total_reads"])) for s in param["samples"] ]
-        total = sum([json[j]["total_reads"]*2 for j in json])
-        mapped_number = [ json[s]["mappable_reads"]*2 for s in param["samples"] ]
+        raw =  [ "%s, %s" % (count_in_million(json_au[s]["total"]/2), count_in_million(json_au[s]["total"]/2)) for s in param["samples"] ]
+        total = sum([int(json_au[j]["total"]) for j in json_au])
+        mapped_number = [int(json_au[s]["map"]) for s in param["samples"]]
 
     ## use autosome ratio
-    mapped_rate = [ decimal_to_latex_percent(json_au[s]) for s in param["samples"] ]
+    mapped_rate = [ decimal_to_latex_percent(json_au[s]["ratio"]) for s in param["samples"] ]
 
+    ## raw reads doc
     reads_latex = JinjaTemplateCommand(
         template = input['tex'],
         name = "raw_reads",
@@ -185,6 +188,7 @@ def reads_doc(input = {"tex": "", "json": "", "json_autosome": ""}, output = {"r
                  "combo": count_in_million(total)})
     template_dump(reads_latex)
 
+    ## mapping status doc
     mapping_latex = JinjaTemplateCommand(
         template = input['tex'],
         name = "reads mapping",
@@ -421,6 +425,8 @@ def single_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": "
     fastq_sample = open(output["fastq_sample"], "w")
 
     cur_num = - 1
+    written = 0
+
     for rand_num in rand_nums:
         while cur_num < rand_num:
             for i in range(4):
@@ -430,6 +436,8 @@ def single_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": "
         for i in range(4):
             fastq_sample.write(fastq.readline())
         cur_num += 1
+        written += 1
+    assert written == param["random_number"]
 
     fastq_sample.close()
     fastq.close()
@@ -442,6 +450,8 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fha, fhb = open(fqa),  open(fqb)
         suba, subb = open(suba, "w"), open(subb, "w")
         rec_no = - 1
+        written = 0
+
         for rr in rand_records:
             while rec_no < rr:
                 rec_no += 1
@@ -451,32 +461,48 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
                 suba.write(fha.readline())
                 subb.write(fhb.readline())
             rec_no += 1
+            written += 1
+        assert written == N
         suba.close()
         subb.close()
         fha.close()
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
 
-def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both"}):
+def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both", "se_or_pe": ""}):
+    """
+    sampling SAM and BED reads files,
+    need to add map_or_unmap, pe_or_se mode
+    """
     num_lines = sum(1 for _ in open(input["sam"]))
-
     header_num = 0
     with open(input["sam"]) as f:
         for line in f:
             if line.startswith("@"):
                 header_num += 1
-            break
+            else:
+                break
+    print(header_num)
 
     rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
+    print(len(rand_nums))
 
     cur_num = -1
+    written = 0
+
     with open(output["sam_sample"], "w") as fout:
         with open(input["sam"], "rU") as fin:
             for rand_num in rand_nums:
                 while cur_num < rand_num:
-                    fin.readline()
                     cur_num+=1
+                    data = fin.readline()
+                    if data.startswith("@"):
+                        fout.write(data)
+
                 fout.write(fin.readline())
+                cur_num += 1
+                written += 1
+    assert  written == param["random_number"]
 
 def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples": ""}):
     """
@@ -484,11 +510,16 @@ def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples
     """
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}
     for i, s in zip(input["count"], param["samples"]):
+        json_dict["stat"][s] = {}
         with open(i, 'rU') as f:
             data = f.read().strip().split("\t")
             no_chrM_tag = data[0]
             total = data[1]
-        json_dict["stat"][s] = round(float(no_chrM_tag) / float(total), 3)
+
+        json_dict["stat"][s]["ratio"] = round(float(no_chrM_tag) / float(total), 3)
+        json_dict["stat"][s]["map"] = no_chrM_tag
+        json_dict["stat"][s]["total"] = total
+
     json_dump(json_dict)
 
 ## summary of library contamination
@@ -596,7 +627,7 @@ def stat_bowtie(input={"bowtie_summaries": []},
 
 def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom_info": ""},
               output = {"dir": "", "conf": ""},
-              param = {"K": "", "FDRS": "0.01", "species": ""}):
+              param = {"K": "", "FDRS": "0.01", "species": "", "keepdup": "T"}):
     cf = ConfigParser()
     ## preserve uppercase
     cf.optionxform = str
@@ -611,7 +642,7 @@ def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom
     setting(cf, "_OUTDIR_", output["dir"])
     setting(cf, "_RANDIR_", output["dir"])
     setting(cf, "_FDRS_", param["fdrs"])
-    setting(cf, "_DUPOK_", "T")
+    setting(cf, "_DUPOK_", param["keepdup"])         ## keep duplicates
     setting(cf, "_CHKCHR_", "chrX")     ## To check if data contains this chromosome
     setting(cf, "_CHECK_", "F")         ## change to F in case that hotspot error for no wavelets peaks, other method
     cf.write(open(output["conf"], "w"))
