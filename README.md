@@ -1,10 +1,26 @@
 ## What is GCAP
 > `G`lobal `C`hromatin `A`ccessibility `P`ipeline
-> Dnase, Bnase, Cnase的pipeline
+> 
+> X-nase(Dnase, Bnase, Cnase) Quality analysis pipeline
+
+### Prototype  Features
+
+1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
+2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
+3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
+4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
+5. estimate library complexity/redundancy by 5M reads(picard, Markduplicates)
+6. estimates SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
+7. estimate replicates consistency by
+	1. BigWiggle Correlation on 5M sampled data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
+    2. Overlap by hotspot(Hotspot, b) regions overlap from 5M reads(Intersection over Union regions, bedtools)
+    
+8. This has been removed, calculate hotspot(filtered Hotspot, b) promotor percentage and compare with genome promotor percentage for 5M reads Hotspot(b) regions(built-in script)
+9. calculate Phastcon score of top 1000 non-promotor Hotspot(filtered Hotspot, b)regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
+10. estimate (narrow peaks, d) overlap with ENCODE narrow peaks union DHS on replicates of 5M reads(bedtools)
 
 
-Install 
-=============
+### Install 
 
 First, install pipeline framework: 
 
@@ -13,19 +29,19 @@ First, install pipeline framework:
 	pip install samflow
 	
 	
-Install FastQC
-------------------
+#### Install FastQC
 *Site* 	<http://www.bioinformatics.babraham.ac.uk/projects/fastqc/>
+Per sequence quality score median is parsed from fastq text output.
 This part will be replaced by Jim's codes
 
-Install Bowtie
-----------------
+#### Install Bowtie
+
 *Site* <http://bowtie-bio.sourceforge.net/index.shtml>
 
 Add binary to PATH and download `hg19, mm9, rn4` index for library contamination evaluation
 
-install Hotspot
-----------------
+#### install Hotspot
+
 * Hotspot default setting is used
 * Download hotspot v3 from <http://www.uwencode.org/proj/hotspot/>, get the hotspot5, wavelets, wavePeaks into `$PATH`, you may need to compile from hotspot-deploy directory
 
@@ -34,7 +50,7 @@ install Hotspot
 
 No matter it's SE or PE data, we take 5' tags for hotspot peaks calling.
 
-NOTE: 
+NOTE on hotspot output: 
 	
 	SPOT score is calculated by *-both-passes/*hotspot.twopass.zscore.wig
 	*-both-passes/*.twopass.merge150.wgt10.zgt2.wig minimally thresholded hotspots
@@ -96,8 +112,7 @@ NOTE:
 
 	
 
-install bedops and bedtools
------------------------------
+#### install bedops and bedtools
 * use bedtools to get peaks overlap with union DHS region
 * use bedops to merge replicates peaks regions
 * use bedtools to get non overlap regions
@@ -107,18 +122,16 @@ install bedops and bedtools
 *** 
 
 
-install picard
---------------------
-Use picard for SortSam, Markduplicates for both single end and pair end data.
+#### install picard
+Use picard for SortSam, Markduplicates for both single end and pair end data, this will be replaced with `census`
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
 For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R. Fragment size evaluation for PE and SE will be replaced by MACS2 in the future.
 
-All default, `2G` memory, `4cpu` will be used.
+All default, `2G` memory, `4cpu` will be used in picard. For sampling large files, we use -XX:-UseGCOverheadLimit and 4g memory setting.
 
 ----
 
-install UCSC component
--------------------------
+#### install UCSC component
 *Site* <http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/>
 `BedClip` is used to remove outlier chromosome locations.
 `bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle.
@@ -127,8 +140,7 @@ install UCSC component
 With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union peaks regions.
 
 
-Built-in modules
--------------------
+#### Built-in modules
 This part is `built-in modules from cistrome-application`.
 include BedIO, FeatIO, Func.
 Export pipeline-scripts/conservation_average.py to $PATH, needs `bx-python`.
@@ -142,14 +154,24 @@ Three modes of sampling:
 We decide to use built-in to sample 5M mappable and unmappable reads from PE and SE SAM files and both transfer to hospot as single end data.
 
 
-DHS
--------
-Merged DHS from ENCODE narrow peaks is used as reference union DHS regions.
+#### DHS
+Merged DHS from ENCODE narrow peaks is used as reference union DHS regions. For union DHS, please email authors.
 
 
+##### Optionally
 
-Install latex and jinja2
--------------------------
+Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating: 
+
+	git clone https://github.com/taoliu/MACS/
+	or 
+	pip install MACS2
+
+`Add MACS2 SPOT score calculation, much stringent than Hotspot spot score.`
+
+Install bwa for optional reads mapping tool, bwa is used for reads mapping evaluation only, which needs corresponding species index, default: 4 threads.
+
+
+#### Install latex and jinja2
 Check whether `pdflatex` is executable or not.
 `jinja2` is a template module for rendering latex document:
 	
@@ -160,8 +182,7 @@ Check whether `pdflatex` is executable or not.
 - - - -
 
 
-Usage
-=============
+### Usage
 
 refer to static/GCAP_pe.conf for pair end data, static/GCAP_se.conf for single end data.
 
@@ -266,35 +287,9 @@ resume process when problems occurs:
 
 
 ----
+Example
+=========
+- An output from GCAP
 
-Prototype  Features
-======================
-
-1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
-2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
-3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
-4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
-5. estimate library complexity/redundancy by 5M reads(picard, Markduplicates)
-6. estimates SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
-7. estimate replicates consistency by
-	1. BigWiggle Correlation on 5M sampled data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
-    2. Overlap by hotspot(Hotspot, b) regions overlap from 5M reads(Intersection over Union regions, bedtools)
-    
-8. This has been removed, calculate hotspot(filtered Hotspot, b) promotor percentage and compare with genome promotor percentage for 5M reads Hotspot(b) regions(built-in script)
-9. calculate Phastcon score of top 1000 non-promotor Hotspot(filtered Hotspot, b)regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
-10. estimate (narrow peaks, d) overlap with ENCODE narrow peaks union DHS on replicates of 5M reads(bedtools)
-
-Optionally
-===========
-
-Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating: 
-
-	git clone https://github.com/taoliu/MACS/
-	or 
-	pip install MACS2
-
-`Add MACS2 SPOT score calculation, much stringent than Hotspot spot score.`
-
-Install bwa for optional reads mapping tool. 
 
 ![QC report](example.png)
