@@ -189,6 +189,7 @@ refer to static/GCAP_pe.conf for pair end data, static/GCAP_se.conf for single e
 
 `Input Format`
 Only support fastq and bam files now.
+
 Fastq Files:
 
 	in the conf files
@@ -197,18 +198,28 @@ Fastq Files:
 	If input is single end data, use `,` to separate replicates files.
 	If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
 	
-BAM Files, supporting two types of sources: 
+BAM Files: 
 	
 	in the conf files, set to `bam, pe` or `bam, se`.
-	original mapping results `SAM` converted by `samtools view -bt` or `picard SortSam SO=queryname` or `samtools sort -n` by query name to make sure that paired reads are in neighboring places, we could use built-in sampling or `[picard] sample` part, because GCAP built-in sampling method only support query name ordered SAM files.
+	Query name should be in the neighboring places.
+	Original mapping results `SAM` converted by `samtools view -bt` or `picard SortSam SO=queryname` or `samtools sort -n` by query name to make sure that paired reads are in neighboring places, we could use built-in sampling or `[picard] sample` part, because GCAP built-in sampling method only support query name ordered SAM files.
 	
-
 	If you are not clear about your mapping parameter, you could try bamToFastq to convert bam to fastq and remapping through our above Fastq scheme.
 
 	
-SAM Files, original mapping results with header , if you only have `bam` files, use `samtools view -h`
+SAM Files, original mapping results with headers , if you only have `bam` files, use `samtools view -h`:
 
-	in the conf file `sequence_type` to `sam, pe` or `sam, se`, files separated by comma.
+	In the conf file `sequence_type` to `sam, pe` or `sam, se`, files separated by comma.
+	
+	If you want all SAM files have uniform mapping parameters, you could convert SAM to fastq by samtools view -bt and bamToFastq, then follow up our fastq schemes.
+
+reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with this format):
+     
+    As our proposals is based on sampling raw reads, including mappable and unmappable reads, BED reads files(BED with 6 fields) do not have unmappable information, so this format is added only for analysis of the rest criteria. As bedToBam could only process SE bed data, PE would be regarded as SE, too. We take all BED format data as SE data, we sample down BED mappable reads 5M for comparison. Change sequence_type to `bed`. This is used for internal data comparison now.
+    
+    e.g.
+    chr1    192388233       192388269       SOLEXA-1GA-2_0072_FC629AV:6:1:3436:1104#0/1     255     -
+	chr10   43655355        43655391        SOLEXA-1GA-2_0072_FC629AV:6:1:3567:1104#0/1     255     +
 
 #### Tips 
 
@@ -221,14 +232,6 @@ If your SAM/BAM files are not original mapping results, you may need `Restoring 
  samtools sort fixmate <byname.bam> <byname.fixed.bam>
 ##### sort by genomic coordinate
  samtools sort <byname.fixed.bam> <out.bam>
-	
-reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with this format):
-     
-    As our proposals is based on sampling raw reads, including mappable and unmappable reads, BED reads files(BED with 6 fields) do not have unmappable information, so this format is added only for analysis of the rest criteria. As bedToBam could only process SE bed data, PE would be regarded as SE, too. We take all BED format data as SE data, we sample down BED mappable reads 5M for comparison. Change sequence_type to `bed`. This is used for internal data comparison now.
-    
-    e.g.
-    chr1    192388233       192388269       SOLEXA-1GA-2_0072_FC629AV:6:1:3436:1104#0/1     255     -
-	chr10   43655355        43655391        SOLEXA-1GA-2_0072_FC629AV:6:1:3567:1104#0/1     255     +
 
 
 ##### Keep duplicate
@@ -238,25 +241,28 @@ just `keep_dup = T` in `[hotspot]`.
 instructions on conf files:
 	
 	[Basis]
-	treat = rep_1_pair1, rep_1_pair2; rep_2_pair1, rep_2_pair2
-	sequence_type = pe   ## pe for pair end data, se for single end data
 	user = qinq
 	id = testid
 	species = hg19
+	treat = rep_1_pair1, rep_1_pair2; rep_2_pair1, rep_2_pair2
 	output = results_path
 	read_length = 50
+	sequence_type = pe
 	
 	[tool]
 	mapping = bowtie ## or bwa, for reads mapping
-	peak_calling = hotspot ## or macs2, finish
+	peak_calling = hotspot ## or macs2
 	
 	[picard]
-	markdup = path   ## MarkDuplicates.jar path
-	sort = path      ## SortSam.jar, for converting and sorting
-	threads = 4    
-	sample = path	 ## DownsampleSam.jar path
+	markdup = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/MarkDuplicates.jar
+	sort = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/SortSam.jar
+	threads = 4
+	insertsize = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/CollectInsertSizeMetrics.jar
+	#sample = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/DownsampleSam.jar ## comment to use built-in sampling tool
 	
-	[contaminate]    ## for library contamination evaluation, use bowtie for fast assessment only	hg19 = /mnt/Storage/data/Bowtie/hg19
+	[contaminate]    ## for library contamination evaluation, use bowtie for fast assessment only
+	
+	hg19 = /mnt/Storage/data/Bowtie/hg19
 	mm9 = /mnt/Storage/data/Bowtie/mm9
 	rn4 = /mnt/Storage/home/qinq/projects/chilin/rn4_index/rn4
 	
@@ -275,18 +281,25 @@ instructions on conf files:
 	tss = /mnt/Storage/home/qinq/lib/refgenes/hg19.refgene.tss                         ## +- 1kb tss extracted from UCSC refgene 
 	
 	[hotspot]
-	chrom_info = chromosome_info   ## from hotspot website	
+	## get from http://www.uwencode.org/proj/hotspot/
+	chrom_info = chromosome_info   ## from hotspot website
 	mappable_region = path  ## this is downloaded from hotspot website, it's a necessary part for evaluating genomic promotor percentage
 	keep_dup = T            ## duplicates or not
+	fdrs = "0.01"           ## several fdrs
 	
 	## if your peak caller is macs2	, fill the following parameters
-	[macs]
+	[macs2]
 	species = hs
 	keep_dup = all ## keep all duplicate tags
 	shiftsize = 50 ## could be customized
-	
-	
-for human should be the data contained in the static/hg19.refgene.tss, which is +- 1Kb from refseq tss, you could use your customized `promotor` regions
+
+
+##### For more conf examples
+see in the static folder.
+
+##### promotor regions	
+for human should be the data contained in the static/hg19.refgene.tss, which is +- 1Kb from refseq tss, you could use your customized `promotor` regions.
+
 
 
 * dry run

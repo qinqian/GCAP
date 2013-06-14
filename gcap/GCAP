@@ -691,14 +691,23 @@ def _hotspot_on_replicates(workflow, conf):
 
     for i, target in enumerate(conf.treatment_targets):
         ## prepare input for hotspot, get mappable tags and starch into output directory
-        attach_back(workflow,
-            ShellCommand(
-                "{tool} {input} {output[starch]} {param[type]}",
-                tool = "tags.sh",
-                input = target + "%s.all" % kind,
-                output = {"starch": target + ".bed.starch", "loc_count": target + ".bed.starch.loc_count",
-                          "uniq_loc": target + ".bed.starch.uniq_loc"},
-                param = {"type": ty}))
+        if conf.seq_type.startswith("bed"):
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.all" % kind,
+                    output = {"starch": target + ".bed.starch", "loc_count": target + ".bed.starch.loc_count",
+                              "uniq_loc": target + ".bed.starch.uniq_loc"},
+                    param = {"type": ty}))
+        else:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.all" % kind,
+                    output = {"starch": target + ".bed.starch"},
+                    param = {"type": ty}))
 
         ## generate configuration for hotspot v3
         hotspot_conf = attach_back(workflow,
@@ -711,7 +720,7 @@ def _hotspot_on_replicates(workflow, conf):
                           "dir": conf.target_dir},
                 param = {"fdrs": "0.01", "K": conf.get("Basis", "read_length"),
                          "species": conf.get("Basis", "species"),
-                         "keepdup": "T"},
+                         "keep_dup": "T"},
                 name = "hotspot config"
             ))
         hotspot_conf.param.update(conf.items("hotspot"))
@@ -755,14 +764,24 @@ def _hotspot_on_replicates(workflow, conf):
     ## Use 5M reads to estimate SPOT
     for i, target in enumerate(conf.treatment_targets):
         ## prepare input for hotspot, get mappable tags and starch into output directory
-        attach_back(workflow,
-            ShellCommand(
-                "{tool} {input} {output[starch]} {param[type]}",
-                tool = "tags.sh",
-                input = target + "%s.5M" %kind,
-                output = {"starch": target + "_5M.bed.starch", "loc_count": target + "_5M.bed.starch.loc_count",
-                          "uniq_loc": target + "_5M.bed.starch.uniq_loc"},
-                param = {"type": ty}))
+        if conf.seq_type.startswith("bed"):
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.5M" %kind,
+                    output = {"starch": target + "_5M.bed.starch", "loc_count": target + "_5M.bed.starch.loc_count",
+                              "uniq_loc": target + "_5M.bed.starch.uniq_loc"},
+                    param = {"type": ty}))
+        else:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.5M" %kind,
+                    output = {"starch": target + "_5M.bed.starch"},
+                    param = {"type": ty}))
+
         ## generate configuration for hotspot v3
         hotspot_conf = attach_back(workflow,
             PythonCommand(spot_conf,
@@ -774,7 +793,7 @@ def _hotspot_on_replicates(workflow, conf):
                           "dir": conf.target_dir},
                 param = {"fdrs": "0.01", "K": conf.get("Basis", "read_length"),
                          "species": conf.get("Basis", "species"),
-                         "keepdup": "T"}))
+                         "keep_dup": "T"}))
         hotspot_conf.param.update(conf.items("hotspot"))
         ## run hotspot v3
         attach_back(workflow, ShellCommand(
@@ -990,7 +1009,7 @@ def _hotspot_combo(workflow, conf):
                       "dir": conf.target_dir},
             param = {"fdrs": "0.01", "K": conf.get("Basis", "read_length"),
                      "species": conf.get("Basis", "species"),
-                     "keepdup": "T"}))
+                     "keep_dup": "T"}))
     hotspot_conf.param.update(conf.items("hotspot"))
 
     ## run hotspot v3
@@ -1089,15 +1108,24 @@ def _macs2_on_reps(workflow, conf):
         macs2_on_rep.update(param=conf.items("macs2"))
 
         ## SPOT score for MACS2 5M reads
-        attach_back(workflow,
-            ShellCommand(
-                "{tool} {input} {output[starch]} {param[type]}",
-                tool = "tags.sh",
-                input = target + "%s.5M" % kind,
-                output = {"starch": target + "_5M.bed.starch",
-                          "uniq_loc": target + "_5M.bed.starch.uniq_loc",
-                          "loc_count": target + "_5M.bed.starch.loc_count"},
-                param = {"type": ty}))
+        if conf.seq_type.startswith("bed"):
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.5M" % kind,
+                    output = {"starch": target + "_5M.bed.starch",
+                              "uniq_loc": target + "_5M.bed.starch.uniq_loc",
+                              "loc_count": target + "_5M.bed.starch.loc_count"},
+                    param = {"type": ty}))
+        else:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input} {output[starch]} {param[type]}",
+                    tool = "tags.sh",
+                    input = target + "%s.5M" % kind,
+                    output = {"starch": target + "_5M.bed.starch"},
+                    param = {"type": ty}))
 
         attach_back(workflow, ShellCommand(
             "{tool} {input[starch]} {input[bed]}",

@@ -675,7 +675,7 @@ def stat_bowtie(input={"bowtie_summaries": []},
 
 def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom_info": ""},
               output = {"dir": "", "conf": ""},
-              param = {"K": "", "FDRS": "0.01", "species": "", "keepdup": "T"}):
+              param = {"K": "", "FDRS": "0.01", "species": "", "keep_dup": "T"}):
     cf = ConfigParser()
     ## preserve uppercase
     cf.optionxform = str
@@ -690,7 +690,7 @@ def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom
     setting(cf, "_OUTDIR_", output["dir"])
     setting(cf, "_RANDIR_", output["dir"])
     setting(cf, "_FDRS_", param["fdrs"])
-    setting(cf, "_DUPOK_", param["keepdup"])         ## keep duplicates
+    setting(cf, "_DUPOK_", param["keep_dup"])         ## keep duplicates
     setting(cf, "_CHKCHR_", "chrX")     ## To check if data contains this chromosome
     setting(cf, "_CHECK_", "F")         ## change to F in case that hotspot error for no wavelets peaks, other method
     cf.write(open(output["conf"], "w"))
