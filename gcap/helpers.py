@@ -271,9 +271,9 @@ def stat_redun(input = {"picard": "", "built_count": ""}, output = {"json": ""},
             json_dict["stat"][s] = d
     else:
         for b, s in zip(input["built_count"], param["samples"]):
-            total_loc = open(b[0]).read().strip().split()[1]
-            uniq_loc = open(b[1]).read().strip().split()[1]
-            redun_ratio = 1 - float(uniq_loc) / total_loc
+            total_loc = open(b[0]).read().strip().split()[0]
+            uniq_loc = open(b[1]).read().strip().split()[0]
+            redun_ratio = 1 - float(uniq_loc) / float(total_loc)
             json_dict["stat"][s] = redun_ratio
     json_dump(json_dict)
 
