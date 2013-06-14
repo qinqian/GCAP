@@ -1,1 +1,1 @@
-BEGIN {FS="\t"; OFS="\t"}; {if (/^[^@]/) {if ($2!="4"){ul[$2"\t"$3"\t"$4] += 1}}} END{ for (ull in ul) printf ull"\t"ul[ull]"\n"}
+BEGIN {FS="\t"; OFS="\t"}; {if (/^[^@]/) {if ($2!="4" && $3!="chrM" && $3!="*"){ul[$2"\t"$3"\t"$4] += 1}}} END{ for (ull in ul) printf ull"\t"ul[ull]"\n"}

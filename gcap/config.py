@@ -99,6 +99,20 @@ class Conf(object):
         return [os.path.basename(i) for i in self.treatment_targets]
 
     @property
+    def treatment_bam(self):
+        """
+        inital input BAMs or SAMs, BEDs, separated by comma, no matter PE or SE
+        """
+        return [self.to_abs_path(i.strip()) for i in self.get("Basis", "treat").split(",")]
+
+    @property
+    def treatment_bed(self):
+        """
+        initial input reads BAMs, SAMs, BEDs, separated by comma, no matter PE or SE
+        """
+        return [self.to_abs_path(i.strip()) for i in self.get("Basis", "treat").split(",")]
+
+    @property
     def treatment_raws(self):
         """
         single end data separate by , for replicates
@@ -112,6 +126,8 @@ class Conf(object):
                 for i in self.get("Basis", "treat").split(";"):
                     data_list.append([ self.to_abs_path(j.strip()) for j in i.split(",") ])
                 return data_list
+            elif self.seq_type.startswith("bam") or self.seq_type.startswith("sam") or self.seq_type.startswith("bed"):
+                return self.treatment_bam
         else:
             raise NoTreatmentData
 
@@ -121,6 +137,8 @@ class Conf(object):
             return self.treatment_single_targets
         elif self.seq_type == "pe":
             return self.treatment_pair_targets["reps"]
+        elif self.seq_type.startswith("bam") or self.seq_type.startswith("sam") or self.seq_type.startswith("bed"):
+            return self.treatment_single_targets
 
     @property
     def treatment_pair_data(self):
@@ -157,4 +175,4 @@ class Conf(object):
 
     @property
     def seq_type(self):
-        return self.get("Basis", "sequence_type")
+        return self.get("Basis", "sequence_type").strip().lower()

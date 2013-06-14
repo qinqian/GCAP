@@ -160,14 +160,15 @@
 %# %- endif
 %# %- endif
 
-%- if section_name == "conservation"
-  \midrule
-%- if reps >= 2
-  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} & \\
-%- else
-  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} \\
-%- endif
-%- endif
+%# no conservation, to uncomment if needed
+%# %- if section_name == "conservation"
+%#  \midrule
+%# %- if reps >= 2
+%#  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} & \\
+%# %- else
+%#  Evolutionary Conservation (5M) & $>$0.2 &  \VAR{conservation | join(' & ')} \\
+%# %- endif
+%# %- endif
 
 %- if section_name == "DHS"
   \midrule

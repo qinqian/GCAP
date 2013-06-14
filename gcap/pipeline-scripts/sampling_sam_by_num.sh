@@ -7,9 +7,11 @@ sam=$1
 prog=$2
 output=$3
 
+number=$4
+
 
 total=$(grep -v @ $sam | wc -l | cut -f 2 -d" ")
-percent=$(echo "scale=10; 5000000/$total" | bc)
+percent=$(echo "scale=10; $number/$total" | bc)
 
 echo $sam
 echo $total

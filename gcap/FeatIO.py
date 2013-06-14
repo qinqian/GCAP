@@ -1,5 +1,3 @@
-# Time-stamp: <2010-05-24 11:01:21 Tao Liu>
-
 """Module for PeakI, WigTrackI, FWTrackI and TrackI classes
 
 Copyright (c) 2007,2008 Tao Liu <taoliu@jimmy.harvard.edu>
@@ -17,15 +15,13 @@ with the distribution).
 # ------------------------------------
 # python modules
 # ------------------------------------
-import os
-import re
-import sys
-import time
 import logging
-from gcap.Func import mean,median,std
 from array import array
 from math import sqrt
 from random import sample as random_sample
+
+from gcap.Func import std
+
 # ------------------------------------
 # constants
 # ------------------------------------

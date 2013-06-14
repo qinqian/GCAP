@@ -3,12 +3,12 @@ import json
 import os
 import random
 import re
-import tempfile
-from jinja2 import Environment, FileSystemLoader
-import math
-from samflow.command import AbstractCommand, ShellCommand
-from samflow.workflow import attach_back
 import sys
+
+from jinja2 import Environment, FileSystemLoader
+from samflow.command import AbstractCommand
+from samflow.workflow import attach_back
+
 
 class StepChecker:
     def __init__(self, start, end, skips):
@@ -170,7 +170,7 @@ def reads_doc(input = {"tex": "", #"json": "",
         total = sum([int(json_au[j]["total"]) for j in json_au])
         mapped_number = [ int(json_au[s]["map"]) for s in param["samples"] ]
     else:
-        raw =  [ "%s, %s" % (count_in_million(json_au[s]["total"]/2), count_in_million(json_au[s]["total"]/2)) for s in param["samples"] ]
+        raw =  [ "%s, %s" % (count_in_million(int(json_au[s]["total"])/2), count_in_million(int(json_au[s]["total"])/2)) for s in param["samples"] ]
         total = sum([int(json_au[j]["total"]) for j in json_au])
         mapped_number = [int(json_au[s]["map"]) for s in param["samples"]]
 
@@ -258,17 +258,23 @@ def redundancy_doc(input = {"tex": "", "json": ""}, output = {"redun": ""}, para
 
     template_dump(redun_latex)
 
-def stat_redun(input = {"picard": ""}, output = {"json": ""}, param = {"samples": ""}):
+def stat_redun(input = {"picard": "", "built_count": ""}, output = {"json": ""}, param = {"samples": "", "format": ""}):
     """
     this will be replaced by Gifford's codes,
     currently picard
     """
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}
-    for f, s in zip(input["picard"], param["samples"]):
-        data = open(f).readlines()[7]
-        d = data.split("\t")[7]
-        json_dict["stat"][s] = d
-
+    if param["format"] != "bed":
+        for f, s in zip(input["picard"], param["samples"]):
+            data = open(f).readlines()[7]
+            d = data.split("\t")[7]
+            json_dict["stat"][s] = d
+    else:
+        for b, s in zip(input["built_count"], param["samples"]):
+            total_loc = open(b[0]).read().strip().split()[1]
+            uniq_loc = open(b[1]).read().strip().split()[1]
+            redun_ratio = 1 - float(uniq_loc) / total_loc
+            json_dict["stat"][s] = redun_ratio
     json_dump(json_dict)
 
 def get_size(rscript):
@@ -471,38 +477,80 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
 
 def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both", "se_or_pe": ""}):
     """
-    sampling SAM and BED reads files,
-    need to add map_or_unmap, pe_or_se mode
+    sampling SAM or BED reads files,
+    need to add map_or_unmap
     """
     num_lines = sum(1 for _ in open(input["sam"]))
     header_num = 0
+    header = []
     with open(input["sam"]) as f:
         for line in f:
             if line.startswith("@"):
                 header_num += 1
+                header.append(line)
             else:
                 break
     print(header_num)
 
-    rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
-    print(len(rand_nums))
+    if param["map_or_unmap"] == "both":
+        if param["se_or_pe"] == "se":
+            rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
+            print(len(rand_nums))
 
-    cur_num = -1
-    written = 0
+            cur_num = -1
+            written = 0
 
-    with open(output["sam_sample"], "w") as fout:
-        with open(input["sam"], "rU") as fin:
-            for rand_num in rand_nums:
-                while cur_num < rand_num:
-                    cur_num+=1
-                    data = fin.readline()
-                    if data.startswith("@"):
-                        fout.write(data)
+            with open(output["sam_sample"], "w") as fout:
+                with open(input["sam"], "rU") as fin:
+                    for rand_num in rand_nums:
+                        while cur_num < rand_num:
+                            cur_num+=1
+                            data = fin.readline()
+                            if data.startswith("@"):
+                                fout.write(data)
 
-                fout.write(fin.readline())
-                cur_num += 1
-                written += 1
-    assert  written == param["random_number"]
+                        fout.write(fin.readline())
+                        cur_num += 1
+                        written += 1
+            assert  written == param["random_number"]
+        elif param["se_or_pe"] == "pe":
+            random_pe = []
+            cur_num = -1
+            written = 0
+
+            ## large memory version 1, faster
+            for _ in range(int(param["random_number"]/2)):
+                num = random.choice(range(header_num, num_lines, 2))
+                random_pe.append(num)
+                random_pe.append(num+1)
+            rand_nums = random_pe
+            data = open(input["sam"]).readlines()
+
+            with open(output["sam_sample"], 'w') as f:
+               f.write("".join(header))
+               for i in rand_nums:
+                   f.write(data[i])
+
+            ## small memory version 2, slower and simpler
+            ## most of pair end reads paired, need to modify
+#            for _ in range(int(param["random_number"]/2)):
+#               num = random.choice(range(header_num, num_lines, 2))
+#               random_pe.append(num)
+#            rand_nums = sorted(random_pe)
+#            with open(output["sam_sample"], "w") as fout:
+#                with open(input["sam"], "rU") as fin:
+#                    for rand_num in rand_nums:
+#                        while cur_num < rand_num:
+#                            cur_num+=1
+#                            data = fin.readline()
+#                            if data.startswith("@"):
+#                                fout.write(data)
+#                        fout.write(fin.readline())
+#                        fout.write(fin.readline())
+#                        cur_num += 1
+#                        written += 2
+#                assert  written == param["random_number"]
+    else: pass
 
 def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples": ""}):
     """

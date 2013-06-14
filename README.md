@@ -6,10 +6,10 @@
 ### Prototype  Features
 
 1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
-2. reads mapping and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
+2. reads mapping(exclude mitochrondrial mapping reads) and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
 3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
 4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
-5. estimate library complexity/redundancy by 5M reads(picard, Markduplicates)
+5. estimate library complexity/redundancy by 5M reads(census;picard, Markduplicates; macs2 filterdup; awk)
 6. estimates SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
 7. estimate replicates consistency by
 	1. BigWiggle Correlation on 5M sampled data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
@@ -122,7 +122,7 @@ NOTE on hotspot output:
 *** 
 
 
-#### install picard
+#### install picard and samtools
 Use picard for SortSam, Markduplicates for both single end and pair end data, this will be replaced with `census`
 Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
 For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 *predict_model.R. Fragment size evaluation for PE and SE will be replaced by MACS2 in the future.
@@ -147,9 +147,10 @@ Export pipeline-scripts/conservation_average.py to $PATH, needs `bx-python`.
 
 Three modes of sampling:
 
-- We use built-in function to do raw reads sampling from PE and SE FASTQ.
-- Python function to sample reads from PE and SE SAM files， including `mappable and unmappable reads`.
-- picard sampling for PE and SE SAM files. (May use many threads and memory)
+- We use built-in function to do raw reads sampling from PE and SE FASTQ(default) .
+- Python function to sample reads from PE and SE SAM(BAM converted SAM) files， including `mappable and unmappable reads`.(default for SAM and BAM)
+- picard sampling for PE and SE SAM and BAM files mappable reads. (May use many threads and memory)(optional in picard options, uncomment for default)
+- MACS2 sampling for SE BAM files SE mappable reads.(not added)
 
 We decide to use built-in to sample 5M mappable and unmappable reads from PE and SE SAM files and both transfer to hospot as single end data.
 
@@ -186,21 +187,59 @@ Check whether `pdflatex` is executable or not.
 
 refer to static/GCAP_pe.conf for pair end data, static/GCAP_se.conf for single end data.
 
-If input is single end data, use `,` to separate replicates files.
-If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
-
 `Input Format`
-Only support fastq files now, bam files and reads bed files support will be added later.
+Only support fastq and bam files now.
+Fastq Files:
 
-`Keep duplicate`
-is an important option for peaks calling. You could customize it by python conf files. To keep duplicates tags,
+	in the conf files
+	`sequence_type` to control sequence type:`se` or `pe`.
+	
+	If input is single end data, use `,` to separate replicates files.
+	If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
+	
+BAM Files, supporting two types of sources: 
+	
+	in the conf files, set to `bam, pe` or `bam, se`.
+	original mapping results `SAM` converted by `samtools view -bt` or `picard SortSam SO=queryname` or `samtools sort -n` by query name to make sure that paired reads are in neighboring places, we could use built-in sampling or `[picard] sample` part, because GCAP built-in sampling method only support query name ordered SAM files.
+	
+
+	If you are not clear about your mapping parameter, you could try bamToFastq to convert bam to fastq and remapping through our above Fastq scheme.
+
+	
+SAM Files, original mapping results with header , if you only have `bam` files, use `samtools view -h`
+
+	in the conf file `sequence_type` to `sam, pe` or `sam, se`, files separated by comma.
+
+#### Tips 
+
+`samtools view -X` to see the mapping status from column 2nd, see FLAG explanation`http://picard.sourceforge.net/explain-flags.html`
+If your SAM/BAM files are not original mapping results, you may need `Restoring pairing information`, this is needed for random access of raw paired reads.
+
+##### sort by name
+ samtools sort -n <in.bam> <byname.bam>
+##### fix the mate info
+ samtools sort fixmate <byname.bam> <byname.fixed.bam>
+##### sort by genomic coordinate
+ samtools sort <byname.fixed.bam> <out.bam>
+	
+reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with this format):
+     
+    As our proposals is based on sampling raw reads, including mappable and unmappable reads, BED reads files(BED with 6 fields) do not have unmappable information, so this format is added only for analysis of the rest criteria. As bedToBam could only process SE bed data, PE would be regarded as SE, too. We take all BED format data as SE data, we sample down BED mappable reads 5M for comparison. Change sequence_type to `bed`. This is used for internal data comparison now.
+    
+    e.g.
+    chr1    192388233       192388269       SOLEXA-1GA-2_0072_FC629AV:6:1:3436:1104#0/1     255     -
+	chr10   43655355        43655391        SOLEXA-1GA-2_0072_FC629AV:6:1:3567:1104#0/1     255     +
+
+
+##### Keep duplicate
+this is an important option for peaks calling. You could customize it by python conf files. To keep duplicates tags,
 just `keep_dup = T` in `[hotspot]`.
 
 instructions on conf files:
 	
 	[Basis]
 	treat = rep_1_pair1, rep_1_pair2; rep_2_pair1, rep_2_pair2
-	seq_type = pe   ## pe for pair end data, se for single end data
+	sequence_type = pe   ## pe for pair end data, se for single end data
 	user = qinq
 	id = testid
 	species = hg19
@@ -284,6 +323,12 @@ resume process when problems occurs:
   
   		GCAP clean -c GCAP_pe.conf
   		GCAP purge -c GCAP_pe.conf
+
+Reference
+============
+1. http://sourceforge.net/apps/mediawiki/srma/index.php?title=User_Guide
+2. http://seqanswers.com/forums/showthread.php?t=16375
+3. http://picard.sourceforge.net/explain-flags.html
 
 
 ----
