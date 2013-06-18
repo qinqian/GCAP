@@ -166,11 +166,11 @@ def reads_doc(input = {"tex": "", #"json": "",
     ## use correct order
 
     if param["seq_type"] == "se":
-        raw =  [ count_in_million(json_au[s]["total"]) for s in param["samples"] ]
+        raw =  [ count_in_million(int(json_au[s]["total"])) for s in param["samples"] ]
         total = sum([int(json_au[j]["total"]) for j in json_au])
         mapped_number = [ int(json_au[s]["map"]) for s in param["samples"] ]
     else:
-        raw =  [ "%s, %s" % (count_in_million(int(json_au[s]["total"])/2), count_in_million(int(json_au[s]["total"])/2)) for s in param["samples"] ]
+        raw =  [ "%s, %s" % (count_in_million(int(int(json_au[s]["total"])/2)), count_in_million(int(int(json_au[s]["total"])/2))) for s in param["samples"] ]
         total = sum([int(json_au[j]["total"]) for j in json_au])
         mapped_number = [int(json_au[s]["map"]) for s in param["samples"]]
 

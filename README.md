@@ -156,10 +156,12 @@ We decide to use built-in to sample 5M mappable and unmappable reads from PE and
 
 
 #### DHS
-Merged DHS from ENCODE narrow peaks is used as reference union DHS regions. For union DHS, please email authors.
+Merged DHS from ENCODE narrow peaks is used as reference union DHS regions. We use ENCODE narrowPeak for union DHS extraction, we get union DHS from +/- 150bp from narrowPeak summits, *site* <http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/> please email authors to get the BED files.
 
+#### Blacklist
+*Site* <http://compbio.tongji.edu.cn/~qinq/wgEncodeDacMapabilityConsensusExcludable.bed> is the latest blacklist for human, no mouse blacklist is obtained now.
 
-##### Optionally
+##### Other tools
 
 Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating: 
 
