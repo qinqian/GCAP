@@ -519,37 +519,37 @@ def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"ran
             written = 0
 
             ## large memory version 1, faster
-            for _ in range(int(param["random_number"]/2)):
-                num = random.choice(range(header_num, num_lines, 2))
-                random_pe.append(num)
-                random_pe.append(num+1)
-            rand_nums = random_pe
-            data = open(input["sam"]).readlines()
-
-            with open(output["sam_sample"], 'w') as f:
-               f.write("".join(header))
-               for i in rand_nums:
-                   f.write(data[i])
+#            for _ in range(int(param["random_number"]/2)):
+#                num = random.choice(range(header_num, num_lines, 2))
+#                random_pe.append(num)
+#                random_pe.append(num+1)
+#            rand_nums = random_pe
+#            data = open(input["sam"]).readlines()
+#            with open(output["sam_sample"], 'w') as f:
+#               f.write("".join(header))
+#               for i in rand_nums:
+#                   f.write(data[i])
 
             ## small memory version 2, slower and simpler
             ## most of pair end reads paired, need to modify
-#            for _ in range(int(param["random_number"]/2)):
-#               num = random.choice(range(header_num, num_lines, 2))
-#               random_pe.append(num)
-#            rand_nums = sorted(random_pe)
-#            with open(output["sam_sample"], "w") as fout:
-#                with open(input["sam"], "rU") as fin:
-#                    for rand_num in rand_nums:
-#                        while cur_num < rand_num:
-#                            cur_num+=1
-#                            data = fin.readline()
-#                            if data.startswith("@"):
-#                                fout.write(data)
-#                        fout.write(fin.readline())
-#                        fout.write(fin.readline())
-#                        cur_num += 1
-#                        written += 2
-#                assert  written == param["random_number"]
+            data_range = range(header_num, num_lines, 2)
+            for _ in range(int(param["random_number"]/2)):
+                num = random.choice(data_range)
+                random_pe.append(num)
+                random_pe.append(num+1)
+
+            rand_nums = sorted(random_pe)
+            with open(output["sam_sample"], "w") as fout:
+                fout.write("".join(header))
+                with open(input["sam"], "rU") as fin:
+                    for rand_num in rand_nums:
+                        while cur_num < rand_num:
+                            cur_num+=1
+                            fin.readline()
+                        fout.write(fin.readline())
+                        cur_num += 1
+                        written += 1
+                assert  written == param["random_number"]
     else: pass
 
 def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples": ""}):

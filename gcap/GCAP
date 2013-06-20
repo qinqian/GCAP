@@ -862,33 +862,14 @@ def _peaks_reps_preprocess(workflow, conf):
         elif conf.peakcalltool == "macs2":
             input_peaks = target + "_5M_macs2_peaks.bed"
             non_velcro = target + "_5M_macs2_velcro_non_overlap_peaks.bed"
-        if has_velcro:
-            attach_back(workflow,
-                ShellCommand(
-                    "{tool} -v -a {input[peaks]} -b {input[velcro_peaks_bed]} > {output}",
-                    tool="intersectBed",
-                    input={"peaks": input_peaks,
-                           "velcro_peaks_bed": conf.get("lib", "velcro")},
-                    output = non_velcro,
-                    name = "filter blacklist",
-                    param=None))
-        else: ## for mouse, just rename to *_5M_velcro_non_overlap_peaks.bed
-            attach_back(workflow,
-                ShellCommand(
-                    "cp {input[peaks]} {output}",
-                    tool="cp",
-                    input={"peaks": input_peaks},
-                    output = non_velcro,
-                    name = "No blacklist, not filter blacklist",
-                    param=None))
 
         ## awk and bedClip to remove outlier location from above input
         attach_back(workflow,
             ShellCommand(
-                "{tool} '{{if ($2 >= 0 && $2 < $3) print}}' {input} > {output}",
+                "sed 1d {input} | {tool} '{{if ($2 >= 0 && $2 < $3) print}}' - > {output}",
                 tool="awk",
-                input = non_velcro,
-                output = non_velcro + ".tmp",
+                input = input_peaks,
+                output = input_peaks + ".tmp",
                 name = "filter bed files outlier location"))
 
         # prototype used here to do the similar thing on bedclip
@@ -896,11 +877,31 @@ def _peaks_reps_preprocess(workflow, conf):
             ShellCommand(
                 template="{tool} {input} {param[chrom_len]} {output}",
                 tool="bedClip",
-                input=non_velcro + ".tmp",
-                output = non_velcro + ".final",
+                input=input_peaks + ".tmp",
+                output = input_peaks + ".final",
                 param={'chrom_len': conf.get_path("lib", "chrom_len")},
                 name="bedclip filter"))
         bed_clip.allow_fail = True
+
+        if has_velcro:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} -v -a {input[peaks]} -b {input[velcro_peaks_bed]} > {output}",
+                    tool="intersectBed",
+                    input={"peaks": input_peaks + ".final",
+                           "velcro_peaks_bed": conf.get("lib", "velcro")},
+                    output = non_velcro + ".final",
+                    name = "filter blacklist",
+                    param=None))
+        else: ## for mouse, just rename to *_5M_velcro_non_overlap_peaks.bed
+            attach_back(workflow,
+                ShellCommand(
+                    "cp {input[peaks]} {output}",
+                    tool="cp",
+                    input={"peaks": input_peaks + ".final"},
+                    output = non_velcro + ".final",
+                    name = "No blacklist, not filter blacklist",
+                    param=None))
 
 def _peaks_reps_evaluating(workflow, conf):
     ## use 5M reads to evaluate
@@ -1044,7 +1045,6 @@ def _macs2_on_reps(workflow, conf):
                 output={"peaks": target + "_macs2_all_peaks.bed",
                         "summit": target + "_macs2_all_summits.bed",
                         "treat_bdg": target + "_macs2_all_treat_pileup.bdg",
-                        "ENCODE": target + "_macs2_all_peaks.narrowPeak",
                         "peaks_xls": target + "_macs2_all_peaks.xls",
                         "control_bdg": target + "_macs2_all_control_lambda.bdg"},
                 param={"description": target + "_macs2_all", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
@@ -1099,7 +1099,6 @@ def _macs2_on_reps(workflow, conf):
                 output={"peaks": target + "_5M_macs2_peaks.bed",
                         "summit": target + "_5M_macs2_summits.bed",
                         "treat_bdg": target + "_5M_macs2_treat_pileup.bdg",
-                        "ENCODE": target + "_5M_macs2_peaks.narrowPeak",
                         "peaks_xls": target + "_5M_macs2_peaks.xls",
                         "control_bdg": target + "_5M_macs2_control_lambda.bdg"},
                 param={"description": target + "_5M_macs2", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
@@ -1194,7 +1193,6 @@ def _macs2_on_combo(workflow, conf):
         output={"peaks": conf.prefix + "_peaks.bed",
                 "summit": conf.prefix + "_summits.bed",
                 "treat_bdg": conf.prefix + "_treat_pileup.bdg",
-                "ENCODE": conf.prefix + "_peaks.narrowPeak",
                 "peaks_xls": conf.prefix + "_peaks.xls",
                 "control_bdg": conf.prefix + "_control_lambda.bdg"},
         param={"description": conf.prefix,
@@ -1313,7 +1311,6 @@ def _promoter_overlap(workflow, conf):
     Genome Promotor: cutoff 50% promotor overlaps with mappability regions bases number
     Peaks Promotor: cutoff 50% promotor overlaps with peaks regions bases number
     use 5M reads hotspot b to evaluate promotor overlap
-
     """
     ## use hotspot mappable_region for both hotspot and macs2 peak calling
     attach_back(workflow,
@@ -1511,7 +1508,7 @@ def prepare_clean_up(workflow, conf):
     package all the necessary results and delete temporary files
     preserve bed, bigwiggle, starch, bam and pdf report
     """
-    p_list = ['*.bam', '*.xls', '*_summits.bed', '*_peaks.bed', '*.bw', '*treat*.bed.starch',
+    p_list = ['*.bam', '*.xls', '*_summits.bed', '*_peaks.bed', '*.bw', '*treat*.bed.starch',  "*final",
               '*.R', 'json', '*_treat*-both-passes', '*latex', "*.conf", "*report.tex", "*report.pdf"]
 
     p_pattern = [os.path.join(conf.target_dir, p) for p in p_list]
