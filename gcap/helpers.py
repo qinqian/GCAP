@@ -518,7 +518,7 @@ def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"ran
             cur_num = -1
             written = 0
 
-            ## large memory version 1, faster
+            ## large memory version 1, faster, with paired reads sampling
 #            for _ in range(int(param["random_number"]/2)):
 #                num = random.choice(range(header_num, num_lines, 2))
 #                random_pe.append(num)
@@ -531,7 +531,7 @@ def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"ran
 #                   f.write(data[i])
 
             ## small memory version 2, slower and simpler
-            ## most of pair end reads paired, need to modify
+            ## unpaired reads
             data_range = range(header_num, num_lines, 2)
             for _ in range(int(param["random_number"]/2)):
                 num = random.choice(data_range)
