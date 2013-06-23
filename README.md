@@ -22,7 +22,8 @@ First, install pipeline framework:
 
 Then, install GCAP:
 
-    git clone 
+    git clone https://github.com/qinqian/GCAP
+    python3 setup.py install
 	
 ##### Install FastQC
 *Site* 	<http://www.bioinformatics.babraham.ac.uk/projects/fastqc/>, to keep `fastqc` in $PATH.
