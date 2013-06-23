@@ -531,7 +531,8 @@ def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"ran
 #                   f.write(data[i])
 
             ## small memory version 2, slower and simpler
-            ## unpaired reads
+            ## TODO: suggested by XiuXiu, open file twice, sampling odds and even separately
+            ## this would lead to paired reads
             data_range = range(header_num, num_lines, 2)
             for _ in range(int(param["random_number"]/2)):
                 num = random.choice(data_range)

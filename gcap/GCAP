@@ -497,17 +497,42 @@ def _reads_mapping(workflow, conf):
                      "reps": len(conf.treatment_pairs),
                      "samples": conf.treatment_bases}))
 
-        for target in conf.treatment_targets:
-            lib_sort = attach_back(workflow, ShellCommand(
-                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \
-                VALIDATION_STRINGENCY=SILENT",
-                tool = "java",
-                input = {"bam": target + ".sam.all"},
-                output = {"bam": target + "_picard_sort.bam.all"},
-                param = {"threads": 4},
-                name = "picard sort"))
+        for n, target in enumerate(conf.treatment_targets):
 
-            lib_sort.update(param = conf.items("picard"))
+            if not conf.seq_type.startswith("bam"):
+                ## for large BAM files, may consume too much memory as `too many open files`, increase memory setting to 5g or 6g
+                lib_sort = attach_back(workflow, ShellCommand(
+                    "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \
+                    VALIDATION_STRINGENCY=SILENT",
+                    tool = "java",
+                    input = {"bam": target + ".sam.all"},
+                    output = {"bam": target + "_picard_sort.bam.all"},
+                    param = {"threads": 4},
+                    name = "picard sort"))
+
+                lib_sort.update(param = conf.items("picard"))
+
+    #            ## set conversion tool as samtools, only convert is enough
+    #            ## samtools view -bt and samtools sort -m 6000000000 -no
+    #            for target in conf.sample_targets:
+    #                attach_back(workflow,
+    #                    ShellCommand(
+    #                        "{tool} view -bt {input[chrom_len]} {input[sam]} -o {param[tmp_bam]} && \
+    #                        {tool} sort -m {param[max_mem]} {param[tmp_bam]} {param[output_prefix]}",
+    #                        tool="samtools",
+    #                        input={"sam": target + ".sam", "chrom_len": conf.get_path("lib", "chrom_len")},
+    #                        output={"bam": target + ".bam"},
+    #                        param={"tmp_bam": target + ".tmp.bam", "output_prefix": target,
+    #                               "max_mem": 5000000000}, )) # Use 5G memory as default
+    #            workflow.update(param=conf.items("lib"))
+            else:
+                ## BAM input Files do not need to convert
+                link = attach_back(workflow, ShellCommand(
+                    "{tool} -sf {input[bam]} {output[bam]}",
+                    tool = "ln",
+                    input = {"bam": conf.treatment_bam[n]},
+                    output = {"bam": target + "_picard_sort.bam.all"},   ## actually, may not be sorted bam files
+                    param =None))
 
     else: ## bed files no reads statistics
         pass
