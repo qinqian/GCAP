@@ -210,47 +210,57 @@ Example:
 	sequence_type = pe
 	
 	[tool]
-	mapping = bowtie ## or bwa, for reads mapping
-	peak_calling = hotspot ## or macs2
+	mapping = bwa
+	peak_calling = hotspot
+	## for strand correlation NSC, RSA
+	spp = /mnt/Storage/home/qinq/projects/GCAP/codes/phantompeakqualtools/run_spp.R
+	## correlation for genome or union DHS(filtered by blacklist)
+	cor = genome
+	#cor = union
+	[census]
+	hist = /mnt/Storage/home/qinq/projects/GCAP/codes/census/bam_to_histo.py
+	calc = /mnt/Storage/home/qinq/projects/GCAP/codes/census/calculate_libsize.py
+	census_exclude = /mnt/Storage/home/qinq/projects/GCAP/codes/census/seq.cov005.ONHG19.bed
 	
-	[picard]
-	markdup = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/MarkDuplicates.jar
-	sort = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/SortSam.jar
+	[picard]sort = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/SortSam.jar
 	threads = 4
 	insertsize = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/CollectInsertSizeMetrics.jar
-	#sample = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/DownsampleSam.jar ## comment to use built-in sampling tool
+	[lib]
+	genome_index = /mnt/Storage/home/qinq/lib/hg19.fa
+	## samtools view -bt chromosome length
+	chrom_len = /mnt/Storage/data/Samtool/chromInfo_hg19.txt
+	chrom_bed =  /mnt/Storage/home/qinq/lib/chr_limit_hg19.bed
+	## union DHS filtered by bedClip to remove outlier
+	dhs = /mnt/Storage/home/qinq/projects/GCAP/data/ENCODE_Peaks/hg19_filtered_dhs_clip.bed
+	velcro = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed
+	## dhs filtered by velcro, then converted by bedToBigBed
+	filtered_dhs_bb = /mnt/Storage/home/qinq/projects/GCAP/data/ENCODE_Peaks/hg19_filtered_dhs.bigbed
 	
-	[contaminate]    ## for library contamination evaluation, use bowtie for fast assessment only
-	
+	[contaminate]
+	## use bowtie index to fast evaluate library purity
 	hg19 = /mnt/Storage/data/Bowtie/hg19
 	mm9 = /mnt/Storage/data/Bowtie/mm9
-	rn4 = /mnt/Storage/home/qinq/projects/chilin/rn4_index/rn4
+	rn4 = /mnt/Storage/data/Bowtie/rn4_index/rn4
 	
 	[fastqc]
 	threads = 5
 	
-	[bowtie] ## if using bowtie
-	max_aign = 1  ## keep unique mappable reads or not
-	
-	[lib] ## external data
-	genome_index = /mnt/Storage/data/Bowtie/hg19                                       ## bowtie or bwa index 
-	chrom_len = /mnt/Storage/data/Samtool/chromInfo_hg19.txt
-	chrom_bed =  /mnt/Storage/home/qinq/lib/chr_limit_hg19.bed                         ## chromosome limitation BED file
-	dhs = /mnt/Storage/data/DHS/DHS_hg19.bed                                                 ## your union DHS sites path
-	blacklist = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed    ## black list
+	[bowtie]
+	max_align = 1
 	
 	[hotspot]
 	## get from http://www.uwencode.org/proj/hotspot/
-	chrom_info = chromosome_info   ## from hotspot website
-	mappable_region = path  ## this is downloaded from hotspot website, it's a necessary part for evaluating genomic promotor percentage
-	keep_dup = T            ## duplicates or not
-	fdrs = "0.01"           ## several fdrs
+	chrom_info = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v3/data/hg19.chromInfo.bed
+	## if no corresponding reads length mappable regions, use chrom_info or build yourself
+	## another solution is to remove all repetitive or unmappble regions in your bam tags.
+	mappable_region = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v3/data/hg19.K50.mappable_only.bed 
+	fdrs = "0.01"
+	keep_dup = T
 	
-	## if your peak caller is macs2	, fill the following parameters
 	[macs2]
 	species = hs
-	keep_dup = all ## keep all duplicate tags
-	shiftsize = 50 ## could be customized
+	keep_dup = all
+	shiftsize = 50
 
 Instructions on the `conf` details.
 `Input Format`
@@ -373,7 +383,7 @@ b) samtools view sample.bam | grep -v XT:A:R | wc -l
 
 c) samtools view -q1 sample.bam | wc -l
 
-###### For bowtie
+##### For bowtie
 Use `-m 1` to only report uniquely mapped reads.
 
 ##### sort by name
