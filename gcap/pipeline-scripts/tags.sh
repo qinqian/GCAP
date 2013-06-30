@@ -44,9 +44,11 @@ then
     echo "$seqtype, bed files"
     if [ ! -e $tags ]
     then
+        ## calculate redundancy
         cat $bed | awk  'BEGIN{FS="\t"; OFS="\t"} {if ($6=="+") {print $1,int($2),int($2)+1 } else {print $1,int($3)-1,int($3)}}' - | sort-bed - | starch - > $tags
         unstarch $tags | tee ${tags}.tmp | wc -l > ${tags}.loc_count
         uniq ${tags}.tmp | wc -l > ${tags}.uniq_loc
+        rm ${tags}.tmp
     else
         echo "$tags Already exists!"
     fi

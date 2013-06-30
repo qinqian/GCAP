@@ -1,6 +1,6 @@
 #! /bin/bash
 
-if [ $# -lt 3 ];then
+if [ $# -lt 4 ];then
     echo `basename $0` "config for hotspot"
     echo "Need 1 parameters now: <pipeDir> <tokenFile> <output>"
     exit 1
@@ -10,6 +10,7 @@ scriptTokBin="script-tokenizer.py" ## write to bin
 pipeDir=$1
 tokenFile=$2
 output=$3
+spot=$4
 
 ## Do SPOT only (set _FDRS_ to "N" in runall.tokens.txt)
 # scripts="$pipeDir/run_make_lib
@@ -52,7 +53,10 @@ bash ./run_pass1_hotspot.tok
 bash ./run_pass1_merge_and_thresh_hotspots.tok
 bash ./run_pass2_hotspot.tok
 bash ./run_rescore_hotspot_passes.tok
+if [ $spot == "5M" ]
+then
 bash ./run_spot.tok
+fi
 Rscript ./run_thresh_hot.R.tok
 bash ./run_both-passes_merge_and_thresh_hotspots.tok
 bash ./run_add_peaks_per_hotspot.tok

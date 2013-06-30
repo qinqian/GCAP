@@ -57,17 +57,10 @@ def parse_args(args=None):
 
     return parser.parse_args(args)
 
-## only support fastq, bed and bam files
 def _versatile_format(workflow, conf):
     """
-    support bam and bed files
+    support SAM/BAM and BED reads files
     """
-    ## for bam
-    ## convert to fastq and remapping
-    ## or awk and peaks calling directly
-    ## bam to sam, sampling by built-in
-    # is processed by Fastqc
-    ## then peaks calling
     for n, target in enumerate(conf.treatment_targets):
             if conf.seq_type.startswith("bam"):
                 attach_back(workflow,
@@ -75,225 +68,186 @@ def _versatile_format(workflow, conf):
                         "{tool} view -h {input[bam]} > {output[sam]}",
                         tool = "samtools",
                         input = {"bam": conf.treatment_bam[n]},
-                        output = {"sam": target + ".sam.all"},
+                        output = {"sam": target + "_all.sam"},
                         name = "samtools conversion"))
-
             elif conf.seq_type.startswith("sam"):
                 attach_back(workflow,
                     ShellCommand(
                         "{tool} -sf {input[sam]} {output[sam]}",
                         tool = "ln",
                         input = {"sam": conf.treatment_bam[n]}, ## actually sam files
-                        output = {"sam": target + ".sam.all"},
-                        param = {}))
-
+                        output = {"sam": target + "_all.sam"}))
             elif conf.seq_type.startswith("bed"):
                 attach_back(workflow,
                     ShellCommand(
                         "{tool} -sf {input[bed]} {output[bed]}",
                         tool = "ln",
                         input = {"bed":conf.treatment_bed[n]}, ## actually bed files
-                        output = {"bed":target + ".bed.all"},
-                        param = {}))
+                        output = {"bed":target + "_all.bed"}))
 
 def _sample_reads(workflow, conf, N, format):
     """
-    sample 100k from fastq file for library contamination and sequence quality evaluation
-    sample 5M reads from sam files for other evaluation to avoid remapping
+    get top 100k or 5M reads for following analysis
     """
-    if N == 100000:
-        suffix = "100k"
-    elif N == 5000000:
-        suffix = "5M"
-    else:
-        print("This sampling depth is not used!")
     if format == "fastq":
         if conf.seq_type == "se":
             for n, target in enumerate(conf.treatment_targets):
+#                attach_back(workflow,
+#                    PythonCommand(single_end_fastq_sampling,
+#                        input={"fastq": conf.treatment_raws[n]},
+#                        output={"fastq_sample": target + "_%s.fq" % suffix},
+#                        param={"random_number": N}))     ## use 100kb random reads
                 attach_back(workflow,
-                    PythonCommand(single_end_fastq_sampling,
-                        input={"fastq": conf.treatment_raws[n]},
-                        output={"fastq_sample": target + "_%s.fq" % suffix},
-                        param={"random_number": N}))     ## use 100kb random reads
-
+                    ShellCommand(
+                        "{tool} -n {param[top]} {input[fastq]} > {output[fastq_sample]}",
+                        tool = "head",
+                        input = {"fastq": conf.treatment_raws[n]},
+                        param = {"top": N*4},
+                        output = {"fastq_sample": target + "_100k.fastq"}))
         elif conf.seq_type == "pe":
             for raw, target in conf.treatment_pairs_pe:
+#                attach_back(workflow,
+#                    PythonCommand(pair_end_fastq_sampling,
+#                    input={"fastq": raw},
+#                    output={"fastq_sample": [ i + "_%s.fq" % suffix for i in target ]},
+#                    param={"random_number": N}))     ## use 100kb random reads
                 attach_back(workflow,
-                    PythonCommand(pair_end_fastq_sampling,
-                    input={"fastq": raw},
-                    output={"fastq_sample": [ i + "_%s.fq" % suffix for i in target ]},
-                    param={"random_number": N}))     ## use 100kb random reads
+                    ShellCommand(
+                        "{tool} -n {param[top]} {input[fastq][0]} > {output[fastq_sample][0]} && \
+                        {tool} -n {param[top]} {input[fastq][1]} > {output[fastq_sample][1]} ",
+                        tool = "head",
+                        input = {"fastq": raw},
+                        param = {"top": N*4},
+                        output = {"fastq_sample": [ i + "_100k.fastq" for i in target ]}))
 
     elif format == "sam":
+        suffix = "100k" if N == 100000 else "5M"
         for target, s in zip(conf.treatment_targets, conf.treatment_bases):
-            ## picard sampling mappable tags
-            if "sample" in dict(conf.items("picard")): ## comment or not in conf
-                ## calculate reads number and sampling by 5M / total using picard
-                attach_back(workflow, ShellCommand(
-                   "{tool} {input[sam]} {param[prog]} {output[bam]} {param[number]}",
-                    tool = "sampling_sam_by_num.sh",
-                    input = {"sam": target + ".sam.all"},
-                    output = {"bam": target + ".sam.%s" % suffix},
-                    param = {"prog": conf.get("picard", "sample"),
-                             "number": N}))
-
             ## built-in sampling for raw reads
+            if conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
+                attach_back(workflow, PythonCommand(
+                    sampling,
+                    input = {"sam": target + "_all.sam"},
+                    output = {"sam_sample": target + "_%s.sam" % suffix},
+                    param = {"random_number": N}))
             else:
-                if conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
-                    attach_back(workflow, PythonCommand(
-                        sampling_sam,
-                        input = {"sam": target + ".sam.all"},
-                        output = {"sam_sample": target + ".sam.%s" % suffix},
-                        param = {"random_number": N,
-                                 "map_or_unmap": "both",
-                                 "se_or_pe": conf.seq_type.split(",")[1].strip().lower()}))
+                attach_back(workflow, PythonCommand(
+                    sampling,
+                    input = {"sam": target + "_all.sam"},
+                    output = {"sam_sample": target + "_%s.sam" % suffix},
+                    param = {"random_number": N,
+                             "map_or_unmap": "both",
+                             "se_or_pe": conf.seq_type}))
 
-                else:
-                    attach_back(workflow, PythonCommand(
-                        sampling_sam,
-                        input = {"sam": target + ".sam.all"},
-                        output = {"sam_sample": target + ".sam.%s" % suffix},
-                        param = {"random_number": N,
-                                 "map_or_unmap": "both",
-                                 "se_or_pe": conf.seq_type}))
-
-    elif format == "bed" and conf.seq_type == "bed":
+    elif format == "bed":
         for target in conf.treatment_targets:
             ## macs2 randsample sampling mappable reads to BED reads files
             if "sample" in dict(conf.items("macs2")):
                 attach_back(workflow, ShellCommand(
                     "{tool} randsample -t {input[bed]} -n {param[rand_number]} -o {output[bed]}",
                     tool = "macs2",
-                    input = {"bed": target + ".bed.all"},
-                    output = {"bed": target + ".bed.%s" % suffix}, ## output bed file, to be uniform with other sampling methods
+                    input = {"bed": target + "_all.bed"},
+                    output = {"bed": target + "_5M.bed"}, ## output bed file, to be uniform with other sampling methods
                     param = {"rand_number": N}))
-
             else:
                 attach_back(workflow, PythonCommand(
-                    sampling_sam,                ## take all bed files as SE data
-                    input = {"sam": target + ".bed.all"},
-                    output = {"sam_sample": target + ".bed.%s" % suffix},
-                    param = {"random_number": N,
-                             "map_or_unmap": "both",
-                             "se_or_pe": "se"}))
+                    sampling,                ## take all bed files as SE data
+                    input = {"sam": target + "_all.bed"},
+                    output = {"sam_sample": target + "_5M.bed"},
+                    param = {"random_number": N}))
 
 def _fastqc(workflow, conf):
     """
-    sample 100k reads for fastqc evaluation
-    ## TODO: replace fastqc by using Jim's codes
+    1a. use top 100k reads instead of sampled reads for fastqc evaluation
+    at the same time, prepare input files
     """
-
     if conf.seq_type == "pe": ## PE
-        if re.search(r"\.(fq|fastq)", conf.treatment_raws[0][0]):
-            _sample_reads(workflow, conf, 100000, "fastq")
-            suffix = "_100k.fq"
-            ## for pair end fastq files only
-            for n, target in enumerate(conf.treatment_pair_data):
-                for p in target:
-                    fastqc_run = attach_back(workflow,
-                        ShellCommand(
-                            "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                            input= {"fastq_sample": p + suffix},
-                            output={"target_dir": conf.target_dir,
-                                    "fastqc_summary": p + "%s_fastqc/fastqc_data.txt" % suffix},
-                            tool="fastqc",
-                            param={"threads": 4}))
-
-                    fastqc_run.update(param=conf.items("fastqc"))
-
-                attach_back(workflow, PythonCommand(stat_fastqc,
-                    input = {"fastqc_summaries": [ p + "%s_fastqc/fastqc_data.txt" % suffix for p in target ]},
-                    output = {"json": conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json"},
-                    param = {"samples": target }))
-
-            ## sequence quality latex load, reads length
-            attach_back(workflow, PythonCommand(
-                fastqc_doc,
-                input = {"tex": tex, "json": [ conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json" for n in range(len(conf.treatment_pair_data)) ]},
-                output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
-                param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs),
-                         "pe_samples": [ target for target in conf.treatment_pair_data ]}))
-
-    elif conf.seq_type == "se":
-        if re.search(r"\.(fq|fastq)", conf.treatment_raws[0]):
-            _sample_reads(workflow, conf, 100000, "fastq")
-            suffix = "_100k.fq"
-
-            ## for single end 100k fastq or PE, SE 100k sam
-            for target in conf.treatment_targets:
+        _sample_reads(workflow, conf, 100000, "fastq")
+        for n, target in enumerate(conf.treatment_pair_data):
+            for p in target:
                 fastqc_run = attach_back(workflow,
                     ShellCommand(
                         "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                        input= {"fastq_sample": target +  suffix},
+                        input= {"fastq_sample": p + "_100k.fastq"},
+                        output={"target_dir": conf.target_dir,
+                                "fastqc_summary": p + "_100k_fastqc/fastqc_data.txt"},
+                        tool="fastqc",
+                        param={"threads": 4}))
+                fastqc_run.update(param=conf.items("fastqc"))
+            attach_back(workflow, PythonCommand(stat_fastqc,
+                input = {"fastqc_summaries": [ p + "_100k_fastqc/fastqc_data.txt" for p in target ]},
+                output = {"json": conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json"},
+                param = {"samples": target }))
+        attach_back(workflow, PythonCommand(
+            fastqc_doc,
+            input = {"tex": tex, "json": [ conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json" for n in range(len(conf.treatment_pair_data)) ]},
+            output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
+            param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs),
+                     "pe_samples": [ target for target in conf.treatment_pair_data ]}))
+
+    elif conf.seq_type == "se":
+        _sample_reads(workflow, conf, 100000, "fastq")
+        for target in conf.treatment_targets:
+            fastqc_run = attach_back(workflow,
+                ShellCommand(
+                    "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
+                    input= {"fastq_sample": target +  "_100k.fastq"},
+                    output={"target_dir": conf.target_dir,
+                            "fastqc_summary": target + "_100k_fastqc/fastqc_data.txt"},
+                    tool="fastqc",
+                    param={"threads": 4},
+                    name = "fastqc"))
+            fastqc_run.update(param=conf.items("fastqc"))
+        attach_back(workflow, PythonCommand(stat_fastqc,
+            input = {"fastqc_summaries": [ t + "_100k_fastqc/fastqc_data.txt" for t in conf.treatment_targets ]},
+            output = {"json": conf.json_prefix + "_fastqc.json"},
+            param = {"samples": conf.treatment_bases}))
+        attach_back(workflow, PythonCommand(
+            fastqc_doc,
+            input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
+            output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
+            param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases}))
+
+    elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
+        _versatile_format(workflow, conf)
+        _sample_reads(workflow, conf, 100000, "sam")
+        for target in conf.treatment_targets:
+            attach_back(workflow,
+                ShellCommand(
+                    "{tool} view -bt {input[chrom_len]} {input[sam]} -o {param[tmp_bam]} && \
+                    {tool} sort -m {param[max_mem]} {param[tmp_bam]} {param[output_prefix]}",
+                    tool="samtools",
+                    input={"sam": target + "_100k.sam", "chrom_len": conf.get_path("lib", "chrom_len")},
+                    output={"bam": target + "_100k.bam"},
+                    param={"tmp_bam": target + ".tmp.bam", "output_prefix": target + "_100k",
+                           "max_mem": 5000000000},
+                    name = "sampled sam to bam"
+                )) # Use 5G memory as default
+        file_suffix = "_100k.bam"
+        suffix = "_100k" ## output suffix
+        ## for single end 100k fastq or PE, SE 100k sam
+        for target in conf.treatment_targets:
+                fastqc_run = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
+                        input= {"fastq_sample": target +  file_suffix},
                         output={"target_dir": conf.target_dir,
                                 "fastqc_summary": target + "%s_fastqc/fastqc_data.txt" % suffix},
                         tool="fastqc",
                         param={"threads": 4},
                         name = "fastqc"))
-
                 fastqc_run.update(param=conf.items("fastqc"))
-                ## get per sequence quality median
-            attach_back(workflow, PythonCommand(stat_fastqc,
+        ## get per sequence quality median
+        attach_back(workflow, PythonCommand(stat_fastqc,
                 input = {"fastqc_summaries": [ t + "%s_fastqc/fastqc_data.txt" % suffix for t in conf.treatment_targets ]},
                 output = {"json": conf.json_prefix + "_fastqc.json"},
                 param = {"samples": conf.treatment_bases}))
-
-            ## sequence quality latex load, reads length
-            attach_back(workflow, PythonCommand(
-                fastqc_doc,
-                input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
-                output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
-                param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases}))
-
-    elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
-        if re.search(r"\.(bam|sam)",conf.treatment_bam[0]):
-            ## input bam or bed files
-            _versatile_format(workflow, conf)
-            _sample_reads(workflow, conf, 100000, "sam")
-
-            if "sample" not in dict(conf.items("picard")):
-                for target in conf.treatment_targets:
-                    attach_back(workflow,
-                        ShellCommand(
-                            "{tool} view -bt {input[chrom_len]} {input[sam]} -o {param[tmp_bam]} && \
-                            {tool} sort -m {param[max_mem]} {param[tmp_bam]} {param[output_prefix]}",
-                            tool="samtools",
-                            input={"sam": target + ".sam.100k", "chrom_len": conf.get_path("lib", "chrom_len")},
-                            output={"bam": target + "_100k.bam"},
-                            param={"tmp_bam": target + ".tmp.bam", "output_prefix": target + "_100k",
-                                   "max_mem": 5000000000})) # Use 5G memory as default
-                file_suffix = "_100k.bam"
-                suffix = "_100k" ## output suffix
-            else:
-                suffix = ".sam.100k"
-                file_suffix = ".sam.100k"
-
-            ## for single end 100k fastq or PE, SE 100k sam
-            for target in conf.treatment_targets:
-                    fastqc_run = attach_back(workflow,
-                        ShellCommand(
-                            "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                            input= {"fastq_sample": target +  file_suffix},
-                            output={"target_dir": conf.target_dir,
-                                    "fastqc_summary": target + "%s_fastqc/fastqc_data.txt" % suffix},
-                            tool="fastqc",
-                            param={"threads": 4},
-                            name = "fastqc"))
-
-                    fastqc_run.update(param=conf.items("fastqc"))
-
-            ## get per sequence quality median
-            attach_back(workflow, PythonCommand(stat_fastqc,
-                    input = {"fastqc_summaries": [ t + "%s_fastqc/fastqc_data.txt" % suffix for t in conf.treatment_targets ]},
-                    output = {"json": conf.json_prefix + "_fastqc.json"},
-                    param = {"samples": conf.treatment_bases}))
-
-            ## sequence quality latex load, reads length
-            attach_back(workflow, PythonCommand(
-                fastqc_doc,
-                input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
-                output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
-                param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases}))
+        ## sequence quality latex load, reads length
+        attach_back(workflow, PythonCommand(
+            fastqc_doc,
+            input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
+            output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
+            param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases})) ## single bam samples
 
     elif conf.seq_type.startswith("bed"): ## not evaluate sequence quality
         _versatile_format(workflow, conf)
@@ -310,8 +264,8 @@ def _lib_contamination(workflow, conf):
                     ShellCommand(
                         "{tool} -p {param[threads]} -S -m {param[max_align]} \
                         {param[genome_index]} {input[fastq_sample]} {output[sam]} 2> {output[bowtie_summary]}",
-                        input={"fastq_sample": target + "_100k.fq"},
-                        output={"sam": target + ".sam.100k",
+                        input={"fastq_sample": target + "_100k.fastq"},
+                        output={"sam": target + "_100k.sam",
                                 "bowtie_summary": target + species + "_contam_summary.txt"},
                         tool="bowtie",
                         param={"threads": 4,
@@ -339,13 +293,14 @@ def _lib_contamination(workflow, conf):
                     ShellCommand(
                         "{tool} -X 600 --chunkmbs 300 -n 1 -p {param[threads]} -S -m {param[max_align]} \
                         {param[genome_index]} -1 {input[fastq_sample][0]} -2 {input[fastq_sample][1]} {output[sam]} 2> {output[bowtie_summary]}",
-                        input={"fastq_sample": [ t + "_100k.fq" for t in target ]},
-                        output={"sam": conf.treatment_targets[n] + ".sam.100k",
+                        input={"fastq_sample": [ t + "_100k.fastq" for t in target ]},
+                        output={"sam": conf.treatment_targets[n] + "_100k.sam",
                                 "bowtie_summary": conf.treatment_targets[n] + species + "_contam_summary.txt"},
                         tool="bowtie",
                         param={"threads": 4,
                                "max_align": 1,
-                               "genome_index": conf.get_path("contaminate", species)}))
+                               "genome_index": conf.get_path("contaminate", species)},
+                        name = "library contamination"))
         all_species = [i for i, _ in conf.items("contaminate")]
         bowtie_summaries = []
         for target in conf.treatment_targets:
@@ -366,7 +321,7 @@ def _lib_contamination(workflow, conf):
 
 def _bowtie(workflow, conf):
     """
-     all reads mapping
+    Only all reads mapping, optionally
     """
     if conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
@@ -375,7 +330,7 @@ def _bowtie(workflow, conf):
                                 "{tool} -n 1 -p {param[threads]} -S -m {param[max_align]} \
                                 {param[genome_index]} {input[fastq]} {output[sam]} 2> {output[bowtie_summary]}",
                                 input={"fastq": raw},
-                                output={"sam": target + ".sam.all",
+                                output={"sam": target + "_all.sam",
                                         "bowtie_summary": target + "all_um_summary.txt"},
                                 tool="bowtie",
                                 param={"threads": 4,
@@ -390,18 +345,17 @@ def _bowtie(workflow, conf):
                             "{tool} -X 600 --chunkmbs 300 -n 1 -p {param[threads]} -S -m {param[max_align]} \
                             {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} {output[sam]} 2> {output[bowtie_summary]}",
                             input={"fastq": conf.treatment_raws[n]},
-                            output={"sam": target + ".sam.all",
+                            output={"sam": target + "_all.sam",
                                     "bowtie_summary": target + "all_um_summary.txt"},
                             tool="bowtie",
                             param={"threads": 4,
                                    "max_align": 1,
                                    "genome_index": conf.get_path("lib", "genome_index")}))
             bowtie.update(param = conf.items("bowtie"))
-
     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam") or conf.seq_type.startswith("bed"): ## skip mapping
         pass
 
-## optionally
+## default
 def _bwa(workflow, conf):
     """bwa genome fasta genome index
       2 bwa aln genome.index.fa s_4_1_sequence.fastq > s_4_1.sai
@@ -418,15 +372,13 @@ def _bwa(workflow, conf):
                              "fastq": pair},
                     output = {"sai": pair + ".sai"},
                     param = {"threads": 4}))
-
             attach_back(workflow, ShellCommand(
                 "{tool} sampe {input[index]} {input[sai][0]} {input[sai][1]} {input[fastq][0]} {input[fastq][1]} > {output[sam]}",
                 tool = "bwa",
                 input = {"index": conf.get("lib", "genome_index"),
                          "fastq": [ pair for pair in conf.treatment_raws[n] ],
                          "sai": [ pair + ".sai" for pair in conf.treatment_raws[n] ]},
-                output = {"sam": target + ".sam.all"},
-                param = {}))
+                output = {"sam": target + "_all.sam"}))
 
     elif conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
@@ -436,14 +388,12 @@ def _bwa(workflow, conf):
                     input = {"index": conf.get("lib", "genome_index"),
                              "fastq": raw},
                     output = {"sai": target + ".sai"}))
-
                 attach_back(workflow, ShellCommand(
                     "{tool} samse {input[index]} {input[sai]} {input[fastq]} > {output[sam]}",
                     tool = "bwa",
                     input = {"index": conf.get("lib", "genome_index"),
                              "fastq": raw, "sai": target + ".sai"},
-                    output = {"sam": target + ".sam.all"},
-                    param = {}))
+                    output = {"sam": target + "_all.sam"}))
 
     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam") or conf.seq_type.startswith("bed"): ## skip mapping
         pass
@@ -452,40 +402,28 @@ def _reads_mapping(workflow, conf):
     """
     reads mapping for all reads
     and convert sam to bam, sort
-
     Sam or Bam input, only do statistics
     """
     if conf.maptool == "bowtie":
         _bowtie(workflow, conf)
-
     elif conf.maptool == "bwa":
         _bwa(workflow, conf)
 
-    ## filter mitochondria tags
+    ## filter mitochondria, chrX, chrY tags
     if not conf.seq_type.startswith("bed"):
         uniq_tag = resource_filename("gcap", "pipeline-scripts/uniq_map_exclude_chrM.sh")
         for target in conf.treatment_targets:
+            ## TODO: bowtie and bwa specifically shell script
             attach_back(workflow, ShellCommand(
                 "{tool} -f {param[script]} {input[sam]} > {output[count]}",
                 tool = "awk",
-                input = {"sam": target + ".sam.all"},
+                input = {"sam": target + "_all.sam"},
                 output = {"count": target + "_uniq_tag_autosome.count"},
                 param = {"script": uniq_tag}))
-
         attach_back(workflow, PythonCommand(
             autosome_map,
             input = {"count": [ target + "_uniq_tag_autosome.count" for target in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_um_autosome.json"}, param = {"samples": conf.treatment_bases}))
-
-    #    bowtie_summaries = []
-    #    for target in conf.treatment_targets:
-    #        bowtie_summaries.append(target + "all_um_summary.txt")
-    #    attach_back(workflow,
-    #        PythonCommand(stat_bowtie,
-    #            input={"bowtie_summaries": bowtie_summaries},
-    #            output={"json": conf.json_prefix + "_mapping.json"},
-    #            param={"sams": conf.treatment_bases}))
-
         ## raw reads and reads mapping qc
         attach_back(workflow, PythonCommand(
             reads_doc,
@@ -497,111 +435,122 @@ def _reads_mapping(workflow, conf):
                      "reps": len(conf.treatment_pairs),
                      "samples": conf.treatment_bases}))
 
+        ## convert to BAM file
         for n, target in enumerate(conf.treatment_targets):
-
             if not conf.seq_type.startswith("bam"):
-                ## for large BAM files, may consume too much memory as `too many open files`, increase memory setting to 5g or 6g
-                lib_sort = attach_back(workflow, ShellCommand(
-                    "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \
-                    VALIDATION_STRINGENCY=SILENT",
-                    tool = "java",
-                    input = {"bam": target + ".sam.all"},
-                    output = {"bam": target + "_picard_sort.bam.all"},
-                    param = {"threads": 4},
-                    name = "picard sort"))
-
-                lib_sort.update(param = conf.items("picard"))
-
-    #            ## set conversion tool as samtools, only convert is enough
-    #            ## samtools view -bt and samtools sort -m 6000000000 -no
-    #            for target in conf.sample_targets:
-    #                attach_back(workflow,
-    #                    ShellCommand(
-    #                        "{tool} view -bt {input[chrom_len]} {input[sam]} -o {param[tmp_bam]} && \
-    #                        {tool} sort -m {param[max_mem]} {param[tmp_bam]} {param[output_prefix]}",
-    #                        tool="samtools",
-    #                        input={"sam": target + ".sam", "chrom_len": conf.get_path("lib", "chrom_len")},
-    #                        output={"bam": target + ".bam"},
-    #                        param={"tmp_bam": target + ".tmp.bam", "output_prefix": target,
-    #                               "max_mem": 5000000000}, )) # Use 5G memory as default
-    #            workflow.update(param=conf.items("lib"))
+                attach_back(workflow,
+                    ShellCommand(
+                        "{tool} view -bt {input[chrom_len]} {input[sam]} -o {output[bam]}",
+                        tool="samtools",
+                        input={"sam": target + "_all.sam", "chrom_len": conf.get_path("lib", "chrom_len")},
+                        output={"bam": target + ".bam"}))
+                workflow.update(param=conf.items("lib"))
             else:
                 ## BAM input Files do not need to convert
                 link = attach_back(workflow, ShellCommand(
                     "{tool} -sf {input[bam]} {output[bam]}",
                     tool = "ln",
                     input = {"bam": conf.treatment_bam[n]},
-                    output = {"bam": target + "_picard_sort.bam.all"},   ## actually, may not be sorted bam files
+                    output = {"bam": target + ".bam"},   ## actually, may not be sorted bam files
                     param =None))
-
     else: ## bed files no reads statistics
         pass
 
 def _library_complexity(workflow, conf):
-    """ For Fastq: sample reads => Sort and picard estimates
-        For sam or bam: sample reads => pass => tags.sh => duplicates by wc -l
-    use 5M reads, those are not primary alignment reads are discarded
-     to estimate complexity => duplicates
-    ## TODO: replace picard by using Gifford's script of Census
+    """  sampling 5M reads for following analysis
+    use 5M raw reads for estimation
     """
     ## choose sampling modes
     if not conf.seq_type.startswith("bed"):
+        ## top 5M raw reads
         _sample_reads(workflow, conf, 5000000, "sam")
-
         # picard markduplicates need SortSam
         ## for fastq files
         for target in conf.treatment_targets:
             lib_sort = attach_back(workflow, ShellCommand(
-                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \
+                "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \
                 VALIDATION_STRINGENCY=SILENT",
                 tool = "java",
-                input = {"bam": target + ".sam.5M"},
-                output = {"bam": target + "_picard_sort.bam.5M"},
+                input = {"bam": target + "_5M.sam"},
+                output = {"bam": target + "_5M_sort.bam"},
                 param = {"threads": 4},
-                name = "Library complexity"))
-
+                name = "Library Sort Sam to Bam"))
             lib_sort.update(param = conf.items("picard"))
-
-        # markduplicates
         for target in conf.treatment_targets:
-            lib_dup = attach_back(workflow, ShellCommand(
-                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[markdup]} I={input[bam]} O={output[bam]} METRICS_FILE={output[metrics]} REMOVE_DUPLICATES=false \
-                VALIDATION_STRINGENCY=SILENT",
-                tool = "java",
-                input = {"bam": target + "_picard_sort.bam.5M"},
-                output = {"bam": target + "_markdup.bam.5M", "metrics": target + "_markdup_metric.5M"},
-                param = {"threads": 4}))
-            lib_dup.update(param = conf.items("picard"))
-
-
+#            lib_dup = attach_back(workflow, ShellCommand(
+#                "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[markdup]} I={input[bam]} O={output[bam]} METRICS_FILE={output[metrics]} REMOVE_DUPLICATES=false \
+#                VALIDATION_STRINGENCY=SILENT",
+#                tool = "java",
+#                input = {"bam": target + "_picard_sort.bam.5M"},
+#                output = {"bam": target + "_markdup.bam.5M", "metrics": target + "_markdup_metric.5M"},
+#                param = {"threads": 4}))
+#            lib_dup.update(param = conf.items("picard"))
+#        attach_back(workflow, PythonCommand(
+#            stat_redun_picard,
+#            input = {"picard": [target + "_markdup_metric.5M" for target in conf.treatment_targets ]},
+#            output = {"json": conf.json_prefix + "_redun.json"}, param = {"samples": conf.treatment_bases, "format": "notbed"}))
+            ## use census to estimation instead of picard
+            attach_back(workflow, ShellCommand(
+                "{tool} {param[hist]} {param[se_or_pe]} {param[exclude]} {input[sorted_bam]} | {tool} {param[calc]} - > {output[metrics]}",
+                tool = "python2.7",
+                input = {"sorted_bam": target + "_5M_sort.bam"},
+                output = {"metrics": target + "_census.metric"},
+                param = {"exclude": conf.get("census", "census_exclude"),
+                         "hist": conf.get("census", "hist"),
+                         "calc": conf.get("census", "calc"),
+                         "se_or_pe": "-s" if "se" in conf.seq_type else " "}))
         attach_back(workflow, PythonCommand(
-            stat_redun,
-            input = {"picard": [target + "_markdup_metric.5M" for target in conf.treatment_targets ]},
-            output = {"json": conf.json_prefix + "_redun.json"}, param = {"samples": conf.treatment_bases, "format": "notbed"}))
-
+                stat_redun_census,
+                input = {"census": [target + "_census.metric" for target in conf.treatment_targets]},
+                output = {"json": conf.json_prefix + "_redun.json"},
+                param = {"samples": conf.treatment_bases, "format": "notbed"}))
         attach_back(workflow, PythonCommand(
             redundancy_doc,
             input = {"tex": tex, "json": conf.json_prefix + "_redun.json"},
             output = {"redun": conf.latex_prefix + "redun.tex"},
             param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases}))
 
-    else:   ## sampling bed files, estimate redundancy through built-in tools by tags.sh wc -l in peaks_calling part
+    else:  ## get top 5M reads, use shell to calculate redundancy simply
         _sample_reads(workflow, conf, 5000000, "bed")
+
+def _strand_cor(workflow, conf):
+    """ use ccQualityControl run_spp.R to estimate
+    Rscript run_spp.R -c=<tagAlign/BAMfile> -savp -out=<outFile>
+    support BAM/SAM, fastq input
+    """
+    if not conf.seq_type.startswith("bed"):
+        for target in conf.treatment_targets:
+            attach_back(workflow, ShellCommand(
+                "{tool} {param[spp]} -c={input[bam]} -savp -out={output}",
+                tool = "Rscript",
+                input = {"bam": target + "_5M_sort.bam"},
+                output = target + "_strand_cor",
+                param = {"spp": conf.get("tool", "spp")}))
+        ## add doc and json for NSC, RSC
+        attach_back(workflow, PythonCommand(
+            stat_strand_cor,
+            input = {"metric": [target + "_strand_cor" for target in conf.treatment_targets]},
+            output = {"json": conf.json_prefix + "_strand_cor.json"},
+            param = {"samples": conf.treatment_bases}))
+        attach_back(workflow, PythonCommand(
+            strand_cor_doc,
+            input = {"json": conf.json_prefix + "_strand_cor.json", "tex": tex},
+            output = {"nsc_latex": conf.latex_prefix + "_nsc.tex", "rsc_latex": conf.latex_prefix + "_rsc.tex"},
+            param = {"samples": conf.treatment_bases,
+                     "reps": len(conf.treatment_pairs)}))
 
 def _fragment_size(workflow, conf):
     """
-    We use MACS2 for mean fragment size and standard deviation estimation
-    Use picard for PE mode temporarily
-    Use macs2 for SE mode, bug: several fragment sizes available
+    picard for PE,
+    MACS2 for SE, because of background noise, we choose alternative fragment size closest to size selection
     """
-
     ## picard for pair end
     if conf.seq_type == "pe":
         for target in conf.treatment_targets:
             insert_size = attach_back(workflow, ShellCommand(
-                "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
+                "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
                 tool = "java",
-                input = {"bam": target + "_picard_sort.bam.5M"},
+                input = {"bam": target + "_5M_sort.bam"},
                 output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
                 param = {"threads": 4}))
             insert_size.update(param = conf.items("picard"))
@@ -617,33 +566,28 @@ def _fragment_size(workflow, conf):
         if conf.seq_type.split(",")[1].strip() == "pe":
             for target in conf.treatment_targets:
                 insert_size = attach_back(workflow, ShellCommand(
-                    "{tool} -Xmx2g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
+                    "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
                     tool = "java",
-                    input = {"bam": target + "_picard_sort.bam.5M"},
+                    input = {"bam": target + "_5M_sort.bam"},
                     output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
                     param = {"threads": 4}))
                 insert_size.update(param = conf.items("picard"))
-
             attach_back(workflow, PythonCommand(
                 stat_frag_std,
                 input = {"insert": [ target + "_insert_metric.5M" for target in conf.treatment_targets ]},
                 output = {"json": conf.json_prefix + "_frag.json"},
                 param = {"samples": conf.treatment_bases,
                          "frag_tool": "picard"}))
-
         elif conf.seq_type.split(",")[1].strip() == "se":
             for target in conf.treatment_targets:
                 fragment_size = attach_back(workflow, ShellCommand(
                     "{tool} predictd -i {input[bam]} --rfile {param[prefix]}",
                     tool = "macs2",
-                    input = {"bam": target + "_picard_sort.bam.5M"},
+                    input = {"bam": target + "_5M_sort.bam"},
                     output = {"R": target + "_5M_model.R"},
                     param = {"prefix": target + "_5M"}))
-
                 ## extract standard deviation from MACS2 model.R,
-                ## use m, p, and pileup value for standard deviation; mean fragment size is provided.
-                ## TODO: need to improve MACS2 fragment size and standard deviation evaluation
-                ## add MACS2 pair end data fragment size evaluation for predictd
+                ## use m, p, and pileup value for standard deviation; mean fragment size is provided(choose the one with highest correlation)
                 attach_back(workflow, PythonCommand(
                     stat_frag_std,
                     input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
@@ -656,41 +600,30 @@ def _fragment_size(workflow, conf):
             fragment_size = attach_back(workflow, ShellCommand(
                 "{tool} predictd -i {input[bed]} --rfile {param[prefix]}",
                 tool = "macs2",
-                input = {"bed": target + ".bed.5M"},
+                input = {"bed": target + "_5M.bed"},
                 output = {"R": target + "_5M_model.R"},
                 param = {"prefix": target + "_5M"}))
-
-            ## extract standard deviation from MACS2 model.R,
-            ## use m, p, and pileup value for standard deviation; mean fragment size is provided.
-            ## TODO: need to improve MACS2 fragment size and standard deviation evaluation
-            ## add MACS2 pair end data fragment size evaluation for predictd
             attach_back(workflow, PythonCommand(
                 stat_frag_std,
                 input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
                 output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
                 param = {"samples": conf.treatment_bases,
                          "frag_tool": "macs2"}))
-    ## macs2
+
     elif conf.seq_type == "se":  ## for single end fastq input and SE, PE bam input, use macs2
         for target in conf.treatment_targets:
             fragment_size = attach_back(workflow, ShellCommand(
                                     "{tool} predictd -i {input[bam]} --rfile {param[prefix]}",
                                     tool = "macs2",
-                                    input = {"bam": target + "_picard_sort.bam.5M"},
+                                    input = {"bam": target + "_5M_sort.bam"},
                                     output = {"R": target + "_5M_model.R"},
                                     param = {"prefix": target + "_5M"}))
-
-        ## extract standard deviation from MACS2 model.R,
-        ## use m, p, and pileup value for standard deviation; mean fragment size is provided.
-        ## TODO: need to improve MACS2 fragment size and standard deviation evaluation
-        ## add MACS2 pair end data fragment size evaluation for predictd
         attach_back(workflow, PythonCommand(
             stat_frag_std,
             input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
             param = {"samples": conf.treatment_bases,
                      "frag_tool": "macs2"}))
-
     attach_back(workflow, PythonCommand(
         frag_doc,
         input = {"json": conf.json_prefix + "_frag.json", "tex": tex},
@@ -706,13 +639,13 @@ def _hotspot_on_replicates(workflow, conf):
     ## sometimes wavepeaks don't get peaks evenly distributed, shut down chromosome check
     if conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
         ty = conf.seq_type.split(",")[1].strip().lower()
-        kind = "_picard_sort.bam"
+        kind = ".bam"
     elif conf.seq_type.startswith("bed"):
         ty = "bed"
-        kind = ".bed"
+        kind = "_all.bed"
     else:
         ty = conf.seq_type
-        kind = "_picard_sort.bam"
+        kind = ".bam"
 
     for i, target in enumerate(conf.treatment_targets):
         ## prepare input for hotspot, get mappable tags and starch into output directory
@@ -721,7 +654,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.all" % kind,
+                    input = target + kind,
                     output = {"starch": target + ".bed.starch", "loc_count": target + ".bed.starch.loc_count",
                               "uniq_loc": target + ".bed.starch.uniq_loc"},
                     param = {"type": ty}))
@@ -730,7 +663,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.all" % kind,
+                    input = target + kind,
                     output = {"starch": target + ".bed.starch"},
                     param = {"type": ty}))
 
@@ -746,20 +679,19 @@ def _hotspot_on_replicates(workflow, conf):
                 param = {"fdrs": "0.01", "K": conf.get("Basis", "read_length"),
                          "species": conf.get("Basis", "species"),
                          "keep_dup": "T"},
-                name = "hotspot config"
-            ))
+                name = "hotspot config"))
         hotspot_conf.param.update(conf.items("hotspot"))
 
         ## run hotspot v3
         attach_back(workflow, ShellCommand(
-            "{tool} {input[pipe]} {input[token]} {output[dir]}",
+            "{tool} {input[pipe]} {input[token]} {output[dir]} {param[spot]}",
             tool = "runhotspot",
             input = {"pipe": pipeline_scripts, "token": target + "_runall.tokens.txt"},
             output = {"dir": conf.target_dir,
                       "spot_peaks_combined": conf.hotspot_reps_both_passes_prefix[i] + ".hotspot.twopass.fdr0.01.merge.pks.bed",
                       "density_starch": target + ".tagdensity.bed.starch",
                       "spot": target + ".spot.out"},
-            param = None))
+            param = {"spot": "all"}))
 
         ## hotspot all reads bigwiggle
         attach_back(workflow, ShellCommand(
@@ -794,7 +726,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.5M" %kind,
+                    input = target + kind,
                     output = {"starch": target + "_5M.bed.starch", "loc_count": target + "_5M.bed.starch.loc_count",
                               "uniq_loc": target + "_5M.bed.starch.uniq_loc"},
                     param = {"type": ty}))
@@ -803,7 +735,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.5M" %kind,
+                    input = target + kind,
                     output = {"starch": target + "_5M.bed.starch"},
                     param = {"type": ty}))
 
@@ -830,9 +762,8 @@ def _hotspot_on_replicates(workflow, conf):
                       "density_starch": target + "_5M.tagdensity.bed.starch",
                       "hotspot":  conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig",
                       "spot": target + "_5M.spot.out"},
-            param = None))
-
-        ## density from hotspot 3, 20bp resolution
+            param = {"spot": "5M"}))
+        ## 5M reads density from hotspot v3 tag density, 20bp resolution
         ## for correlation evaluation
         attach_back(workflow, ShellCommand(
             "{tool} {input[starch]} > {output[bed]}",
@@ -851,7 +782,6 @@ def _hotspot_on_replicates(workflow, conf):
                 output=target + "_5M.tagdensity.bed",
                 param={'chrom_bed': conf.get("lib", "chrom_bed")},
                 name="bed replicate filtering"))
-
         ## convert to bigwiggle
         attach_back(workflow,
             ShellCommand(
@@ -861,12 +791,12 @@ def _hotspot_on_replicates(workflow, conf):
                 output=target + "_5M.bw",
                 param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
 
+    ## depend on tags.sh, calculate redundancy
     if conf.seq_type.startswith("bed"):
         attach_back(workflow, PythonCommand(
-            stat_redun,
+            stat_redun_census,
             input = {"built_count": [ [target + "_5M.bed.starch.loc_count", target + "_5M.bed.starch.uniq_loc"] for target in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_redun.json"}, param = {"samples": conf.treatment_bases, "format": conf.seq_type}))
-
         attach_back(workflow, PythonCommand(
             redundancy_doc,
             input = {"tex": tex, "json": conf.json_prefix + "_redun.json"},
@@ -877,10 +807,9 @@ def _peaks_reps_preprocess(workflow, conf):
     """
     remove blacklist and outlier for hotspot b
     """
-    has_velcro = conf.get("lib", "velcro")  ## mouse not have blacklist yet
+    has_velcro = conf.get("lib", "velcro")  ## mouse genome does not have blacklist available
     for i, target in enumerate(conf.treatment_targets):
         ## remove blacklist for human
-        ## mouse no blacklist ??
         if conf.peakcalltool == "hotspot":
             input_peaks = conf.hotspot_reps_both_passes_5M_prefix[i] + ".twopass.merge150.wgt10.zgt2.wig"
             non_velcro = target + "_5M_velcro_non_overlap_hotspot.bed"
@@ -925,12 +854,10 @@ def _peaks_reps_preprocess(workflow, conf):
                     tool="cp",
                     input={"peaks": input_peaks + ".final"},
                     output = non_velcro + ".final",
-                    name = "No blacklist, not filter blacklist",
-                    param=None))
+                    name = "No blacklist, not filter blacklist"))
 
 def _peaks_reps_evaluating(workflow, conf):
-    ## use 5M reads to evaluate
-    ## intersect region ratio in pairwise ways
+    ## use 5M reads hotspot filtered regions for evaluation, intersect region ratio in pairwise ways to calculate I/U
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):
             if conf.peakcalltool == "hotspot":
@@ -946,31 +873,12 @@ def _peaks_reps_evaluating(workflow, conf):
                     input = {"one_rep": one_rep,
                              "another_rep": another_rep},
                     output= conf.treatment_targets[i] + "_reps_overlap_" + "rep" + str(i+1) + "rep" + str(j+1) + ".bed",
-                    name = "replicates Overlap",
-                    param=None))
+                    name = "replicates Overlap"))
 
-    ## get union peaks region from pairwise replicates
-    bed_merge = attach_back(workflow, ShellCommand(
-            "cat {param[reps]} | sort-bed - | {tool} -m - > {output}",
-            tool = "bedops",
-            input = {"reps": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
-                               for target in conf.treatment_targets ]},
-            output = conf.prefix + "_5M_reps_union.bed"))
-    bed_merge.param.update({"reps": " ".join(bed_merge.input["reps"])})
 
-    ## Implemented by Jim, correlation on union regions
-    ## bigWigCorrelate -restrict=testid_reps_union_region.bb testid_treat_rep1_5M.bw testid_treat_rep2_5M.bw
-    ## if you want genome wide correlation, use wigCorrelate
-    union = conf.prefix + "_5M_reps_union.bed"
-    bed_clip = attach_back(workflow,
-        ShellCommand(
-            template="{tool} {input} {param[chrom_len]} {output[union]} && bedToBigBed {output[union]} {param[chrom_len]} {output[bb]}",
-            tool="bedClip",
-            input=union,
-            output ={"union": union + ".filter", "bb": union + ".bigbed"},
-            param = {"chrom_len": conf.get_path("lib", "chrom_len")},
-            name="bedclip filter"))
-
+    ## Implemented by Jim
+    ## correlation in prepared union DHS regions(filtered by blacklist), bigWigCorrelate -restrict=testid_reps_union_region.bb testid_treat_rep1_5M.bw testid_treat_rep2_5M.bw
+    ## correlation in genome wide, wigCorrelate,  wigCorrelate one.wig two.wig ... n.wig
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):
             if conf.peakcalltool == "macs2":
@@ -980,17 +888,27 @@ def _peaks_reps_evaluating(workflow, conf):
                 one_rep = conf.treatment_targets[i] + "_5M.bw"
                 another_rep = conf.treatment_targets[j] + "_5M.bw"
 
-            attach_back(workflow,
-                ShellCommand(
-                    "{tool} -restrict={input[union]} {input[one_rep]} {input[another_rep]} 1>{output[cor_score]}",
-                    tool="bigWigCorrelate",
-                    input = {"one_rep": one_rep,
-                             "another_rep": another_rep,
-                             "union": union + ".bigbed"},
-                    output= {"cor_score": conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score"},
-                    name = "replicates bigwiggle correlation",
-                    param = None))
+            if conf.get("tool", "cor").strip().lower() == "genome":
+                attach_back(workflow,
+                    ShellCommand(
+                        "{tool} {input[one_rep]} {input[another_rep]} 1>{output[cor_score]}",
+                        tool="wigCorrelate",
+                        input = {"one_rep": one_rep,
+                                 "another_rep": another_rep,
+                                 "union": conf.get("lib", "filtered_dhs_bb")},
+                        output= {"cor_score": conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score"},
+                        name = "replicates bigwiggle genome wide correlation"))
 
+            elif conf.get("tool", "cor").strip().lower() == "union":
+                attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -restrict={input[union]} {input[one_rep]} {input[another_rep]} 1>{output[cor_score]}",
+                        tool="bigWigCorrelate",
+                        input = {"one_rep": one_rep,
+                                 "another_rep": another_rep,
+                                 "union": conf.get("lib", "filtered_dhs_bb")},
+                        output= {"cor_score": conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score"},
+                        name = "replicates bigwiggle union DHS correlation"))
     ## peaks replicates json
     bed = [ (conf.treatment_targets[i] + "_reps_overlap_" + "rep" + str(i+1) + "rep" + str(j+1) + ".bed", "Rep %s %s" %(i + 1, j + 1))
             for i in range(len(conf.treatment_targets)) for j in range(i+1, len(conf.treatment_targets)) ]
@@ -998,11 +916,21 @@ def _peaks_reps_evaluating(workflow, conf):
     cor = [ (conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score", "Rep %s %s" %(i + 1, j + 1))
             for i in range(len(conf.treatment_targets)) for j in range(i+1, len(conf.treatment_targets)) ]
 
+    ## get 5M union hotspot regions for I/U evaluation
+    union = attach_back(workflow, ShellCommand(
+        "{tool} -u {param[reps]} > {output[union]}",
+        tool = "bedops",
+        input = {"beds": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" for target in conf.treatment_targets ]},
+        output = {"union": conf.prefix + "_hotspot_5M_union.bed"}))
+    union.param.update({"reps": " ".join(union.input['beds'])})
+
     ## get output to json
     attach_back(workflow, PythonCommand(
         stat_reps,
-        input = {"5M_overlap": bed, "5M_cor": cor, "union": union},
-        output = {"json": conf.json_prefix + "_reps.json"}))
+        input = {"5M_overlap": bed, "5M_cor": cor, "union": conf.prefix + "_hotspot_5M_union.bed"},
+        output = {"json": conf.json_prefix + "_reps.json"},
+        param = {"cor": conf.get("tool", "cor")}
+    ))
 
     ## latex document
     attach_back(workflow, PythonCommand(
@@ -1013,18 +941,16 @@ def _peaks_reps_evaluating(workflow, conf):
 
 
 def _hotspot_combo(workflow, conf):
-    ## starchcat all replicates
     ## all reads combo
     attach_back(workflow,
         ShellCommand(
-            "{tool} {param[tag_list]} > {param[tmp]} && unstarch {param[tmp]} | sort-bed - | starch - > {output}",
-            tool = "starchcat",
+            "{tool} -u {param[tag_list]} | sort-bed - | starch - > {output}",
+            tool = "bedops",
             input = [ target + ".bed.starch" for target in conf.treatment_targets ],
             output = conf.prefix + "_merge_all.bed.starch",
-            param = {"tag_list": " ".join([ target + ".bed.starch" for target in conf.treatment_targets ]),
-                     "tmp": conf.prefix + "_merge_all.bed.starch.tmp"}))
+            param = {"tag_list": " ".join([ target + ".bed.starch" for target in conf.treatment_targets ])}))
 
-    ## config for hotspot 3
+    ## config for hotspot v3
     hotspot_conf = attach_back(workflow,
         PythonCommand(spot_conf,
             input = {"spot_conf": token_file,
@@ -1038,16 +964,43 @@ def _hotspot_combo(workflow, conf):
                      "keep_dup": "T"}))
     hotspot_conf.param.update(conf.items("hotspot"))
 
+
     ## run hotspot v3
     attach_back(workflow, ShellCommand(
-        "{tool} {input[pipe]} {input[token]} {output[dir]}",
+        "{tool} {input[pipe]} {input[token]} {output[dir]} {param[spot]}",
         tool = "runhotspot",
         input = {"pipe": pipeline_scripts, "token": conf.prefix + "_runall_all.tokens.txt"},
         output = {"dir": conf.target_dir,
                   "spot_peaks_combined": conf.hotspot_merge_both_passes_prefix + "_merge_all.hotspot.twopass.fdr0.01.merge.pks.bed",
                   "density_starch": conf.prefix + "_merge_all.tagdensity.bed.starch",
                   "spot": conf.prefix + "_merge_all.spot.out"},
-        param = None))
+        param = {"spot": "all"}))
+
+    attach_back(workflow, ShellCommand(
+        "{tool} {input[starch]} > {output[bed]}",
+        tool = "unstarch",
+        input = {"starch": conf.prefix + "_merge_all.tagdensity.bed.starch"},
+        output = {"bed": conf.prefix + "_merge_all.tagdensity.bed.tmp"},
+        param={'chrom_bed': conf.get("lib", "chrom_bed")},
+        name="bed replicate filtering"))
+
+    attach_back(workflow,
+        ShellCommand(
+            '{tool} intersect -a {input} -b {param[chrom_bed]} -f 1.00 > {output}',
+            tool="bedtools",
+            input=conf.prefix + "_merge_all.tagdensity.bed.tmp",
+            output=conf.prefix + "_merge_all.tagdensity.bed",
+            param={'chrom_bed': conf.get("lib", "chrom_bed")},
+            name="bed replicate filtering"))
+
+    ## convert to bigwiggle
+    attach_back(workflow,
+        ShellCommand(
+            'cut -f 1,2,3,5 {input} > {input}.final && {tool} {input}.final {param[chrom_len]} {output}',
+            tool = "bedGraphToBigWig",
+            input=conf.prefix + "_merge_all.tagdensity.bed",
+            output=conf.prefix + ".bw",
+            param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
 
 def _macs2_on_reps(workflow, conf):
     """
@@ -1055,9 +1008,11 @@ def _macs2_on_reps(workflow, conf):
     """
     ## for all reads
     if conf.seq_type.startswith("bed"):
-        kind = ".bed"
+        kind = "_all.bed"
+        suffix = "_5M.bed"
     else:
-        kind = "_picard_sort.bam"
+        kind = ".bam"
+        suffix = "_5M.bam"
 
     for target in conf.treatment_targets:
         ## keep all duplicate tags as hotspot
@@ -1066,7 +1021,7 @@ def _macs2_on_reps(workflow, conf):
                 "{tool} callpeak -B -q 0.01 -f {param[format]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
-                input={"treat": target + "%s.all" % kind},
+                input={"treat": target + kind},
                 output={"peaks": target + "_macs2_all_peaks.bed",
                         "summit": target + "_macs2_all_summits.bed",
                         "treat_bdg": target + "_macs2_all_treat_pileup.bdg",
@@ -1098,7 +1053,6 @@ def _macs2_on_reps(workflow, conf):
                 output=target + "_macs2_all_treat_pileup.bdg.tmp",
                 param={'chrom_bed': conf.get("lib", "chrom_bed")},
                 name="bedGraph replicate filtering"))
-
         bdg2bw_treatrep = attach_back(workflow,
             ShellCommand(
                 "{tool} {input} {param[chrom_len]} {output}",
@@ -1120,7 +1074,7 @@ def _macs2_on_reps(workflow, conf):
                 "{tool} callpeak -B -q 0.01 -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
-                input={"treat": target + "%s.5M" % kind},
+                input={"treat": target + suffix},
                 output={"peaks": target + "_5M_macs2_peaks.bed",
                         "summit": target + "_5M_macs2_summits.bed",
                         "treat_bdg": target + "_5M_macs2_treat_pileup.bdg",
@@ -1137,7 +1091,7 @@ def _macs2_on_reps(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.5M" % kind,
+                    input = target + suffix,
                     output = {"starch": target + "_5M.bed.starch",
                               "uniq_loc": target + "_5M.bed.starch.uniq_loc",
                               "loc_count": target + "_5M.bed.starch.loc_count"},
@@ -1147,7 +1101,7 @@ def _macs2_on_reps(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + "%s.5M" % kind,
+                    input = target + suffix,
                     output = {"starch": target + "_5M.bed.starch"},
                     param = {"type": ty}))
 
@@ -1155,8 +1109,7 @@ def _macs2_on_reps(workflow, conf):
             "{tool} {input[starch]} {input[bed]}",
             tool = "macs2_spot.sh",
             input = {"starch": target + "_5M.bed.starch", "bed": target + "_5M_macs2_peaks.bed"},
-            output = target + "_5M_macs2_peaks.bed" + ".spot.out",
-            param = {}))
+            output = target + "_5M_macs2_peaks.bed" + ".spot.out"))
 
         ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
         ## filter bdg file to remove over-border coordinates
@@ -1168,7 +1121,6 @@ def _macs2_on_reps(workflow, conf):
                 output=target + "_5M_macs2_treat_pileup.bdg.tmp",
                 param={'chrom_bed': conf.get("lib", "chrom_bed")},
                 name="bedGraph replicate filtering"))
-
         bdg2bw_treatrep = attach_back(workflow,
             ShellCommand(
                 "{tool} {input} {param[chrom_len]} {output}",
@@ -1179,10 +1131,9 @@ def _macs2_on_reps(workflow, conf):
 
     if conf.seq_type.startswith("bed"):
         attach_back(workflow, PythonCommand(
-            stat_redun,
+            stat_redun_census,
             input = {"built_count": [ [target + "_5M.bed.starch.loc_count", target + "_5M.bed.starch.uniq_loc"] for target in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_redun.json"}, param = {"samples": conf.treatment_bases, "format": conf.seq_type}))
-
         attach_back(workflow, PythonCommand(
             redundancy_doc,
             input = {"tex": tex, "json": conf.json_prefix + "_redun.json"},
@@ -1195,7 +1146,7 @@ def _macs2_on_combo(workflow, conf):
         merge_bams_treat = ShellCommand(
             "{tool} merge {output[merged]} {param[bams]}",
             tool="samtools",
-            input=[ target + "_picard_sort.bam.all" for target in conf.treatment_targets],
+            input=[ target + ".bam" for target in conf.treatment_targets],
             output={"merged": conf.prefix + "_treatment.bam"})
         merge_bams_treat.param = {"bams": " ".join(merge_bams_treat.input)}
         attach_back(workflow, merge_bams_treat)
@@ -1205,11 +1156,10 @@ def _macs2_on_combo(workflow, conf):
             "{tool} {param[bed]} > {output[bed]}",
             tool = "cat",
             input = [ target + ".bed.all" for target in conf.treatment_targets ],
-            output = {"bed": conf.prefix + "_treatment.bed"},
-            param = {})
+            output = {"bed": conf.prefix + "_treatment.bed"})
         merge_beds_treat.param = {"bed": " ".join(merge_beds_treat.input)}
+        attach_back(workflow, merge_beds_treat)
         kind = "_treatment.bed"
-
     macs2_on_merged = attach_back(workflow, ShellCommand(
         "{tool} callpeak -B -q 0.01 -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
         {param[treat_opt]} -n {param[description]}",
@@ -1455,9 +1405,7 @@ def _union_DHS_overlap(workflow, conf):
                 input={"pks_spot_bed": peaks,
                        "DHS_peaks_bed": conf.get("lib", "dhs")},
                 output = output,
-                name = "Write out DHS overlap BED",
-                param = None))
-
+                name = "Write out DHS overlap BED"))
     attach_back(workflow, PythonCommand(
         stat_dhs,
         input={"dhs_peaks": [ target + "_DHS_overlap_peaks_bed" if conf.peakcalltool == "hotspot" else target + "_macs2_DHS_overlap_peaks_bed"
@@ -1467,7 +1415,6 @@ def _union_DHS_overlap(workflow, conf):
         output = {"json": conf.json_prefix + "_dhs.json"},
         param= {"samples":conf.treatment_bases},
         name="DHS summary"))
-
     attach_back(workflow, PythonCommand(
         DHS_doc,
         input = {"tex": tex, "json": conf.json_prefix + "_dhs.json"},
@@ -1509,8 +1456,9 @@ def report(workflow, conf):
     if len(conf.treatment_pairs) >= 2:
         collector.append(conf.latex_prefix + "_reps.tex")
 
-    collector.append(conf.latex_prefix + "_promotor.tex")
-    collector.append(conf.latex_prefix + "_conserv.tex")
+    ## not needed for ENCODE
+#    collector.append(conf.latex_prefix + "_promotor.tex")
+#    collector.append(conf.latex_prefix + "_conserv.tex")
     collector.append(conf.latex_prefix + "_dhs.tex")
     collector.append(conf.latex_prefix + "_table_end.tex")
     collector.append(conf.latex_prefix + "_doc_end.tex")
@@ -1595,7 +1543,6 @@ def create_workflow(args, conf):
         output=conf.target_dir))
 
     if need_run(1):
-
         ## input fastq, sample 100k and fastqc,
         ## output fastqc report
         bld.build(_fastqc)
@@ -1610,36 +1557,33 @@ def create_workflow(args, conf):
         bld.build(_library_complexity)
 
     if need_run(5):
-        bld.build(_fragment_size)
+        bld.build(_strand_cor)
 
     if need_run(6):
+        bld.build(_fragment_size)
+
+    if need_run(7):
         if conf.peakcalltool == "hotspot":
             bld.build(_hotspot_on_replicates)
         elif conf.peakcalltool == "macs2":
             bld.build(_macs2_on_reps)
-
         bld.build(_peaks_reps_preprocess)
-
         if have_treat_reps:
             bld.build(_peaks_reps_evaluating)
             if conf.peakcalltool == "hotspot":
                 bld.build(_hotspot_combo)
             elif conf.peakcalltool == "macs2":
                 bld.build(_macs2_on_combo)
-
         bld.build(_peaks_calling_latex)
 
-    ## need modify here
-    if need_run(7):
-        bld.build(_promoter_overlap)
-
-    if need_run(8):
-        bld.build(_conservation)
-
-    if has_dhs and need_run(9):
+#    ## these two criteria, indirectly, abandon
+#    if need_run(8):
+#        bld.build(_promoter_overlap)
+#    if need_run(9):
+#        bld.build(_conservation)
+    if has_dhs and need_run(8):
         bld.build(_union_DHS_overlap)
-
-    if need_run(10):
+    if need_run(9):
         bld.build(report)
     return workflow
 

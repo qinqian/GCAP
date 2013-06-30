@@ -235,7 +235,6 @@ def fastqc_doc(input = {"tex": "", "json": ""}, output = {}, param = {"reps": ""
                  "render_dump": output["len"],
                  "reads_len": len,
                  "reps": param["reps"]})
-
     template_dump(seq_latex)
     template_dump(len_latex)
 
@@ -258,7 +257,7 @@ def redundancy_doc(input = {"tex": "", "json": ""}, output = {"redun": ""}, para
 
     template_dump(redun_latex)
 
-def stat_redun(input = {"picard": "", "built_count": ""}, output = {"json": ""}, param = {"samples": "", "format": ""}):
+def stat_redun_picard(input = {"picard": "", "built_count": ""}, output = {"json": ""}, param = {"samples": "", "format": ""}):
     """
     this will be replaced by Gifford's codes,
     currently picard
@@ -270,6 +269,27 @@ def stat_redun(input = {"picard": "", "built_count": ""}, output = {"json": ""},
             d = data.split("\t")[7]
             json_dict["stat"][s] = d
     else:
+        for b, s in zip(input["built_count"], param["samples"]):
+            total_loc = open(b[0]).read().strip().split()[0]
+            uniq_loc = open(b[1]).read().strip().split()[0]
+            redun_ratio = 1 - float(uniq_loc) / float(total_loc)
+            json_dict["stat"][s] = redun_ratio
+    json_dump(json_dict)
+
+
+def stat_redun_census(input = {"census": "", "built_count": ""}, output = {"json": ""}, param = {"samples": "", "format": ""}):
+    """
+    '\tTotal unique reads (molecules):\t2675277 (99.8%)\n'
+    1 - 99.8%
+    """
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+    if param["format"] != "bed":
+        for f, s in zip(input["census"], param["samples"]):
+            data = open(f).readlines()[4]
+            d = 1 - float(re.findall("\((\d+.\d+)\%\)", data, re.I)[0])/100
+            json_dict["stat"][s] = d
+    else:
+        ## use awk to count
         for b, s in zip(input["built_count"], param["samples"]):
             total_loc = open(b[0]).read().strip().split()[0]
             uniq_loc = open(b[1]).read().strip().split()[0]
@@ -475,83 +495,84 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
 
-def sampling_sam(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both", "se_or_pe": ""}):
+def sampling(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both", "se_or_pe": ""}):
     """
-    sampling SAM or BED reads files,
-    need to add map_or_unmap
+    get top 5M reads from SAM
     """
-    num_lines = sum(1 for _ in open(input["sam"]))
-    header_num = 0
-    header = []
-    with open(input["sam"]) as f:
-        for line in f:
-            if line.startswith("@"):
-                header_num += 1
-                header.append(line)
-            else:
-                break
-    print(header_num)
-
-    if param["map_or_unmap"] == "both":
-        if param["se_or_pe"] == "se":
-            rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
-            print(len(rand_nums))
-
-            cur_num = -1
-            written = 0
-
-            with open(output["sam_sample"], "w") as fout:
-                with open(input["sam"], "rU") as fin:
-                    for rand_num in rand_nums:
-                        while cur_num < rand_num:
-                            cur_num+=1
-                            data = fin.readline()
-                            if data.startswith("@"):
-                                fout.write(data)
-
-                        fout.write(fin.readline())
-                        cur_num += 1
-                        written += 1
-            assert  written == param["random_number"]
-        elif param["se_or_pe"] == "pe":
-            random_pe = []
-            cur_num = -1
-            written = 0
-
-            ## large memory version 1, faster, with paired reads sampling
+    header = os.popen("grep ^@ %s | wc -l" % input["sam"])
+    header_len = int(header.read().strip())
+    os.system("head -n %s %s > %s" % (param["random_number"] + header_len, input["sam"], output["sam_sample"]))
+#    num_lines = sum(1 for _ in open(input["sam"]))
+#    header_num = 0
+#    header = []
+#    with open(input["sam"]) as f:
+#        for line in f:
+#            if line.startswith("@"):
+#                header_num += 1
+#                header.append(line)
+#            else:
+#                break
+#    print(header_num)
+#    if param["map_or_unmap"] == "both":
+#        if param["se_or_pe"] == "se":
+#            rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
+#            print(len(rand_nums))
+#
+#            cur_num = -1
+#            written = 0
+#
+#            with open(output["sam_sample"], "w") as fout:
+#                with open(input["sam"], "rU") as fin:
+#                    for rand_num in rand_nums:
+#                        while cur_num < rand_num:
+#                            cur_num+=1
+#                            data = fin.readline()
+#                            if data.startswith("@"):
+#                                fout.write(data)
+#
+#                        fout.write(fin.readline())
+#                        cur_num += 1
+#                        written += 1
+#            assert  written == param["random_number"]
+#        elif param["se_or_pe"] == "pe":
+#            random_pe = []
+#            cur_num = -1
+#            written = 0
+#
+#            ## large memory version 1, faster, with paired reads sampling
+##            for _ in range(int(param["random_number"]/2)):
+##                num = random.choice(range(header_num, num_lines, 2))
+##                random_pe.append(num)
+##                random_pe.append(num+1)
+##            rand_nums = random_pe
+##            data = open(input["sam"]).readlines()
+##            with open(output["sam_sample"], 'w') as f:
+##               f.write("".join(header))
+##               for i in rand_nums:
+##                   f.write(data[i])
+#
+#            ## small memory version 2, slower and simpler
+#            ## TODO: suggested by XiuXiu, open file twice, sampling odds and even separately
+#            ## this would lead to paired reads
+#            data_range = range(header_num, num_lines, 2)
 #            for _ in range(int(param["random_number"]/2)):
-#                num = random.choice(range(header_num, num_lines, 2))
+#                num = random.choice(data_range)
 #                random_pe.append(num)
 #                random_pe.append(num+1)
-#            rand_nums = random_pe
-#            data = open(input["sam"]).readlines()
-#            with open(output["sam_sample"], 'w') as f:
-#               f.write("".join(header))
-#               for i in rand_nums:
-#                   f.write(data[i])
-
-            ## small memory version 2, slower and simpler
-            ## TODO: suggested by XiuXiu, open file twice, sampling odds and even separately
-            ## this would lead to paired reads
-            data_range = range(header_num, num_lines, 2)
-            for _ in range(int(param["random_number"]/2)):
-                num = random.choice(data_range)
-                random_pe.append(num)
-                random_pe.append(num+1)
-
-            rand_nums = sorted(random_pe)
-            with open(output["sam_sample"], "w") as fout:
-                fout.write("".join(header))
-                with open(input["sam"], "rU") as fin:
-                    for rand_num in rand_nums:
-                        while cur_num < rand_num:
-                            cur_num+=1
-                            fin.readline()
-                        fout.write(fin.readline())
-                        cur_num += 1
-                        written += 1
-                assert  written == param["random_number"]
-    else: pass
+#
+#            rand_nums = sorted(random_pe)
+#            with open(output["sam_sample"], "w") as fout:
+#                fout.write("".join(header))
+#                with open(input["sam"], "rU") as fin:
+#                    for rand_num in rand_nums:
+#                        while cur_num < rand_num:
+#                            cur_num+=1
+#                            fin.readline()
+#                        fout.write(fin.readline())
+#                        cur_num += 1
+#                        written += 1
+#                assert  written == param["random_number"]
+#    else: pass
 
 def autosome_map(input = {"count": ""}, output = {"json": ""}, param = {"samples": ""}):
     """
@@ -663,17 +684,6 @@ def _bowtie_summary_parse(input=""):
 
     return {"total_reads": total_reads, "mappable_reads": mappable_reads, "mappable_rate": mappable_rate}
 
-def stat_bowtie(input={"bowtie_summaries": []},
-                output={"json": ""},
-                param={"sams": []}):
-    json_dict = {"stat": {}, "input": input, "output": output, "param": param}
-
-    for summary, sam in zip(input["bowtie_summaries"], param["sams"]):
-        json_dict["stat"][sam] = _bowtie_summary_parse(summary)
-        json_dict["stat"][sam]["cutoff"] = 0.5 # mappable reads
-
-    json_dump(json_dict)
-
 def spot_conf(input = {"tag": "", "mappable_region": "", "spot_conf": "", "chrom_info": ""},
               output = {"dir": "", "conf": ""},
               param = {"K": "", "FDRS": "0.01", "species": "", "keep_dup": "T"}):
@@ -729,7 +739,7 @@ def spot_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"
     template_dump(spot_latex)
 
 def stat_reps(input={"5M_overlap": "", "5M_cor": "", "union": ""},
-             output={"json": ""}, param=None):
+             output={"json": ""}, param={"cor": "genome"}):
     ## overlap percentage between replicates
     json_dict = {"stat": {}, "input": input, "output": output, "param": param}
     with open(input["union"]) as f:
@@ -744,8 +754,10 @@ def stat_reps(input={"5M_overlap": "", "5M_cor": "", "union": ""},
     json_dict["stat"]["cor"] = {}
     for rep in input["5M_cor"]:
         with open(rep[0]) as f:
-            rep_cor = f.read().strip().split()[0]
-
+            if param["cor"] == "genome":
+                rep_cor = f.read().strip().split()[2]
+            else:
+                rep_cor = f.read().strip().split()[0]
         json_dict["stat"]["cor"][rep[1]] = "%s" % rep_cor
 
     json_dump(json_dict)
@@ -772,6 +784,45 @@ def reps_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {}
                  "overlap": overlap_d, "cor": cor_d})
 
     template_dump(rep_latex)
+
+def stat_strand_cor(input = {"metric": ""}, output = {"json": ""}, param= {"samples": ""}):
+    """RSC NSC: COL9 COL10, COL3: estFragLen"""
+    json_dict = {"stat": {}, "input": input, "output": output, "param": param}
+
+    for i, j in zip(input["metric"], param["samples"]):
+        data = open(i).readlines()
+        l = data[0].strip().split("\t")
+        json_dict["stat"][j] = {}
+        json_dict["stat"][j]["RSC"] = l[8]
+        json_dict["stat"][j]["NSC"] = l[9]
+        json_dict["stat"][j]["Frag"] = l[2]
+    json_dump(json_dict)
+
+def strand_cor_doc(input = {"json": ""}, output = {"nsc_latex": "", "rsc_latex": ""}, param = {"samples": "", "reps": ""}):
+    data = json_load(input["json"])["stat"]
+    NSC = []
+    RSC = []
+    for i in param["samples"]:
+        NSC.append(round(float(data[i]["NSC"]), 2))
+        RSC.append(round(float(data[i]["RSC"]), 2))
+
+    NSC_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "strand correlation latex",
+        param = {"section_name": "NSC",
+                 "render_dump": output["nsc_latex"],
+                 "NSC": NSC,
+                 "reps": param["reps"]})
+    template_dump(NSC_latex)
+
+    RSC_latex = JinjaTemplateCommand(
+        template = input["tex"],
+        name = "strand correlation latex",
+        param = {"section_name": "RSC",
+                 "render_dump": output["rsc_latex"],
+                 "RSC": RSC,
+                 "reps": param["reps"]})
+    template_dump(RSC_latex)
 
 def stat_promotor(input = {"peaks_promotor": "", "peaks": "", "promotor": "", "mappable": ""}, output = {"json": ""}, param={"samples": ""}):
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}

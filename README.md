@@ -110,6 +110,15 @@ NOTE on hotspot output:
 	chr1    3601420 3601570 .       9.750000
 
 	
+##### install phantompeakqualtools
+*site* <https://code.google.com/p/phantompeakqualtools/>
+
+##### install census
+*site* <https://github.com/matted/census>
+Use python2.7, install scipy, pysam, numpy, setuptools.
+Default, we use 0.005 excluded regions:
+
+	 ./bam_to_histo.py seq.cov005.ONHG19.bed sorted.bam | ./calculate_libsize.py -
 
 ##### install bedops and bedtools
 * use bedtools to get peaks overlap with union DHS region
@@ -135,6 +144,8 @@ NOTE on hotspot output:
 *Site* <http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/>
 `BedClip` is used to remove outlier chromosome locations.
 `bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle.
+`wigCorrelate` is used to remove outlier chromosome locations.
+
 
 Replicates consistency
 a. With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union DHS regions(filted by blacklist).
@@ -144,12 +155,19 @@ b. For whole genome correlation, use `wigCorrelate`
 #### Built-in modules
 Export gcap/pipeline-scripts/conservation_average.py to $PATH, needs `bx-python <https://bitbucket.org/james_taylor/bx-python/wiki/Home>` install.
 
+##### union DHS filtered by blacklist
+Merged DHS from ENCODE narrow peaks(only involved in wgEncodeUwDnase* narrowPeaks from University of Washington because of their high quality) is used as reference union DHS regions. We get union DHS from +/- 150bp from narrowPeak summits, *site* <http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/>. Please email authors to get the BED files.
 
-#### DHS
-Merged DHS from ENCODE narrow peaks(only wgEncodeUwDnase* narrowPeaks because of their high quality) is used as reference union DHS regions. We use ENCODE narrowPeak for union DHS extraction, we get union DHS from +/- 150bp from narrowPeak summits, *site* <http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/> please email authors to get the BED files.
-
-#### Blacklist
 *Site* <http://compbio.tongji.edu.cn/~qinq/wgEncodeDacMapabilityConsensusExcludable.bed> is the latest blacklist for human, no mouse blacklist is obtained now.
+
+prepared union DHS (filtered by blacklist for human, no mouse blacklist available now): 
+
+	bedops -d union_dhs.bed blacklist.bed > union_dhs_filtered.bed
+	
+then, convert to bigBed:
+
+	bedToBigBed	union_dhs_filtered.bed chrom_len output.bigbed
+
 
 ##### fragment size tools
 
@@ -159,7 +177,7 @@ Install MACS2 for optional peaks caller and SE fragment size and standard deviat
 	or 
 	pip install MACS2
 
-`Add MACS2 SPOT score calculation, much stringent than Hotspot spot score.`
+`Add MACS2 SPOT score calculation`
 
 
 #### Install latex and jinja2
@@ -216,11 +234,10 @@ Example:
 	
 	[lib] ## external data
 	genome_index = /mnt/Storage/data/Bowtie/hg19                                       ## bowtie or bwa index 
+	chrom_len = /mnt/Storage/data/Samtool/chromInfo_hg19.txt
 	chrom_bed =  /mnt/Storage/home/qinq/lib/chr_limit_hg19.bed                         ## chromosome limitation BED file
-	dhs = /mnt/Storage/data/DHS/DHS_hg19.bed                                           ## your union DHS sites path
-	velcro = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed ## black list
-	phast = /mnt/Storage/data/sync_cistrome_lib/conservation/hg19/placentalMammals/    ## Phastcon score from UCSC
-	tss = /mnt/Storage/home/qinq/lib/refgenes/hg19.refgene.tss                         ## +- 1kb tss extracted from UCSC refgene, in gcap/static
+	dhs = /mnt/Storage/data/DHS/DHS_hg19.bed                                                 ## your union DHS sites path
+	blacklist = /mnt/Storage/home/qinq/lib/wgEncodeHg19ConsensusSignalArtifactRegions.bed    ## black list
 	
 	[hotspot]
 	## get from http://www.uwencode.org/proj/hotspot/
@@ -239,7 +256,7 @@ Instructions on the `conf` details.
 `Input Format`
 support fastq,bam,sam and bed files now.
 
-Fastq Files:
+Fastq Files, the most favorable input:
 
 	in the conf files
 	`sequence_type` to control sequence type:`se` or `pe`.
@@ -247,7 +264,7 @@ Fastq Files:
 	If input is single end data, use `,` to separate replicates files.
 	If input is pair end data, use `,` to separate pairs, `;` to separate replicates.
 	
-BAM Files: 
+BAM Files, default mapped by BWA, if you're using bowtie, we recommend `-m 1` to keep uniquely mapped reads: 
 	
 	in the conf files, set to `bam, pe` or `bam, se`.
 	Query name should be in the neighboring places.
@@ -255,7 +272,7 @@ BAM Files:
 	
 	If you are not clear about your mapping parameter, you could try bamToFastq to convert bam to fastq and remapping through our above Fastq scheme.
 	
-SAM Files, original mapping results with headers , if you only have `bam` files, use `samtools view -h`:
+SAM Files, original mapping results with headers , if you only have `bam` files, use `samtools view -h`, default mapped by BWA, if you're using bowtie, we recommend `-m 1` to keep uniquely mapped reads: 
 
 	In the conf file `sequence_type` to `sam, pe` or `sam, se`, files separated by comma.
 	
@@ -270,9 +287,17 @@ reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with 
 	chr10   43655355        43655391        SOLEXA-1GA-2_0072_FC629AV:6:1:3567:1104#0/1     255     +
 	
 
+`Remember to write your mapping and peaks calling tool.`
+
 `Keep duplicate`
 this is an important option for peaks calling. You could customize it by python conf files. To keep duplicates tags,
 just `keep_dup = T` in `[hotspot]`.
+
+`two modes of correlation`
+you can choose from `[tool]` section,
+
+* `cor = genome` for 5M reads hotspot bigwiggle genome wide correlation 
+* `cor = union` for 5M reads hotspot bigwiggle ENCODE union DHS(filtered by blacklist for human) correlation.	
 
 ##### 2. dry run to make sure the installation and conf for needed files are right
 
@@ -326,18 +351,30 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 
   
 #### Tips 
-extract Top reads from bam, sam or fastq or Three modes of sampling:
+`Update`:  extract Top 100k or 5M reads from bam, sam or fastq instead sampling.
 
-- We use built-in function to do raw reads sampling from PE and SE FASTQ(default) .
+<!--- We use built-in function to do raw reads sampling from PE and SE FASTQ(default) .
 - Python function to sample reads from PE and SE SAM(BAM converted SAM) files， including `mappable and unmappable reads`.(default for SAM and BAM)
 - picard sampling for PE and SE SAM and BAM files mappable reads. (May use many threads and memory)(optional in picard options, uncomment for default)
 - MACS2 sampling for SE BAM files SE mappable reads.(not added)
 
 We decide to use top 5M and 100k mappable and unmappable reads from PE and SE SAM files and both transfer to hospot as single end data.
-
+-->
 
 `samtools view -X` to see the mapping status from column 2nd, see FLAG explanation`http://picard.sourceforge.net/explain-flags.html`
 If your SAM/BAM files are not original mapping results, you may need `Restoring pairing information`, this is needed for random access of raw paired reads.
+
+
+##### Unique mapping
+###### For BWA
+a) samtools view sample.bam | grep XT:A:U | wc -l
+
+b) samtools view sample.bam | grep -v XT:A:R | wc -l
+
+c) samtools view -q1 sample.bam | wc -l
+
+###### For bowtie
+Use `-m 1` to only report uniquely mapped reads.
 
 ##### sort by name
  samtools sort -n <in.bam> <byname.bam>

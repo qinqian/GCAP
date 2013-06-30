@@ -93,9 +93,9 @@
 %- if section_name == "mapping"
   \midrule
 %- if reps >= 2
-  Uniquely Mapped(All) & Bowtie$>$50\%  & \VAR{map | join(' & ')} & \VAR{combo} \\
+  Autosome Uniquely Mapped(All) & Bowtie$>$50\%  & \VAR{map | join(' & ')} & \VAR{combo} \\
 %- else
-  Uniquely Mapped(All) & Bowtie$>$50\%  & \VAR{map | join(' & ')} , \VAR{combo}  \\
+  Autosome Uniquely Mapped(All) & Bowtie$>$50\%  & \VAR{map | join(' & ')} , \VAR{combo}  \\
 %- endif
 %- endif
 
@@ -105,6 +105,24 @@
   Redundancy(5M) & $<$30\% & \VAR{redun | join(' & ')} & \\
 %- else
   Redundancy(5M) & $<$30\% & \VAR{redun | join(' & ')} \\
+%- endif
+%- endif
+
+%- if section_name == "RSC"
+  \midrule
+%- if reps >= 2
+  RSC(5M) & $<$30\% & \VAR{RSC | join(' & ')} & \\
+%- else
+  RSC (5M) & $<$30\% & \VAR{RSC | join(' & ')} \\
+%- endif
+%- endif
+
+%- if section_name == "NSC"
+  \midrule
+%- if reps >= 2
+  NSC(5M) & $<$30\% & \VAR{NSC | join(' & ')} & \\
+%- else
+  NSC (5M) & $<$30\% & \VAR{NSC | join(' & ')} \\
 %- endif
 %- endif
 

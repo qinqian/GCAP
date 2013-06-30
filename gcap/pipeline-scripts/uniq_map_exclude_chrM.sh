@@ -1,1 +1,1 @@
-BEGIN {FS="\t"; OFS="\t"}; {if (/^[^@]/) {total+=1; if ($2!="4" && $3!="chrM" && $3!="*"){ul+=1}}} END{ print ul"\t"total }
+BEGIN {FS="\t"; OFS="\t"}; {if (/^[^@]/) {total+=1; if ($2!="4" && $3!="chrM" && $3!="*" && $3!="chrY" && $3!="chrX"){ul+=1}}} END{ print ul"\t"total }
