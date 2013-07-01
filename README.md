@@ -179,6 +179,7 @@ Install MACS2 for optional peaks caller and SE fragment size and standard deviat
 
 `Add MACS2 SPOT score calculation`
 
+- - - -
 
 #### Install latex and jinja2
 Check whether `pdflatex`(pdflatex (Version 3.141592-1.21a-2.2 (Web2C 7.5.4))) is executable or not. For d
@@ -375,24 +376,42 @@ We decide to use top 5M and 100k mappable and unmappable reads from PE and SE SA
 If your SAM/BAM files are not original mapping results, you may need `Restoring pairing information`, this is needed for random access of raw paired reads.
 
 
-##### Unique mapping
+##### Uniquely mapped reads
 ###### For BWA
-a) samtools view sample.bam | grep XT:A:U | wc -l
+use samtools to extract uniquely mapped reads
+a) samtools view sample.bam | grep XT:A:U | wc -l 
+	or grep XT:A:U sample.sam | wc -l
+b) samtools view sample.bam | grep -v XT:A:R | wc -l ## do not exclude unmapped reads
+c) samtools view -bq1 sample.bam | wc -l   ### as samtools faq told as reliable mapped <http://sourceforge.net/apps/mediawiki/samtools/index.php?title=SAM_FAQ#I_want_to_get_.60unique.27_alignments_from_SAM.2FBAM.>
+TAGS XT:A:R and XT:A:U both have situations with duplicated locations, no matter their scores equal 0 or larger than 0, duplicates and unique reads all have reliable situations.
 
-b) samtools view sample.bam | grep -v XT:A:R | wc -l
+XT:A:R has 0, >1 MapQ and single or multiple locations example:
+  
+	HWI-ST389:264:D0VYWACXX:4:1101:1322:2155        99      chrY    2351610 0       50M     =       2351738 178     CCATGCAGCTGTTTTAATCAGCAATTCTGAGAAGACACAAATGCCCCCCG      @C@FFFFFHHHHHIIJGIIGHGHGJIIIJHHGIJJFEGJIJIIIIGGJIJ      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:2  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chrX,+2401610,50M,0;
+	HWI-ST389:264:D0VYWACXX:4:1101:1322:2155        147     chrY    2351738 0       50M     =       2351610 -178    GAGCCCAGAGTGTGCGATCTGAGCTGTTTCTCAAACCAGGACAAATAAGT      HGH@>HGHCGGIGIGEDIIHDEIGIIIIIIIIIFCIIHDFDHEDAFFC@@      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:2  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chrY,-2351738,50M,0;
+	## single location
+	HWI-ST389:264:D0VYWACXX:4:1101:9357:2101        99      chr5    69542867        0       50M     =       69542938        121     NTGCGCACTGACTAAAGATCAGAGCAGAAAGCAGATTCTAGGAACAGTCA      #1=DDFFFHHHHHJJJJJJJJJJJJJJJJJIJIJJIJJJIJIGIJJJIJI      XT:A:R  NM:i:1  SM:i:0  AM:i:0  X0:i:4  X1:i:4  XM:i:1  XO:i:0  XG:i:0  MD:Z:0C49
+	HWI-ST389:264:D0VYWACXX:4:1101:9357:2101        147     chr5    69542938        0       50M     =       69542867        -121    TCGGCATGCAACAAAATTCAAAGTAAATAGTGGTAAGGTGGGAAATGGAC      HIJIIJIJIGJJJJJJIIIIIJJIIJJIGIHJIIGJJHHHHHFFFFFC@C      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:8  X1:i:1  XM:i:0  XO:i:0  XG:i:0  MD:Z:50
+	## MapQ > 1
+	HWI-ST389:264:D0VYWACXX:4:1101:12092:2178       99      chr11   16167025        5       50M     =       16167197        222     CAATGTTGGAAGTTCTGGCCAGGGCAATCAGGCAGGAGAAAGAAATAAAG      B@CFFFFFHHHHHJJIJJJJIJJJIJJJJGIJIJJJ?FFHJJJIJJJJJJ      XT:A:U  NM:i:0  SM:i:5  AM:i:0  X0:i:1  X1:i:70 XM:i:0  XO:i:0  XG:i:0  MD:Z:50
+	HWI-ST389:264:D0VYWACXX:4:1101:12092:2178       147     chr11   16167197        5       50M     =       16167025        -222    AGTCTCAGGATACAAAATCAATGTACAAAAATCACAAGCATTCTCATACA      JIGIJJJJJIJHJJJJJJJJJJJIHJJJJJJIIHJJJHHHHHFFFFFBCC      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:23 X1:i:3395       XM:i:0  XO:i:0  XG:i:0  MD:Z:50
+		
+XT:A:U has > 1 MapQ and one pair multiple locations example:
 
-c) samtools view -q1 sample.bam | wc -l
+	HWI-ST389:264:D0VYWACXX:4:1101:6110:2188        83      chr15   66712700        33      50M     =       66712461        -289    TTTGAGACCAGCCTGGGCAACATGGCGAAACCCAGTCTCTACAAAAAGTA      JJJJJJHJJIJJJJJJJJJIJJJJJIJIHFJJJJJJJHHHHHFFFFFCCC      XT:A:U  NM:i:0  SM:i:13 AM:i:13 X0:i:1  X1:i:10 XM:i:0  XO:i:0  XG:i:0  MD:Z:50
+	HWI-ST389:264:D0VYWACXX:4:1101:6110:2188        163     chr15   66712461        33      50M     =       66712700        289     		AGTCCCAGCTACTCGGGAGGCTGAGGAATGAGAATCACTTGAACCGGGGA      CCBFFFFFHHHHHJJJJJJJJJJIJJIJIJIIIJIIJIJJIJJJJJJJJ=      XT:A:U  NM:i:0  SM:i:20 AM:i:13 X0:i:1  X1:i:2  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chr11,-89057190,50M,1;chr2,-32834036,50M,1;
 
-##### For bowtie
-Use `-m 1` to only report uniquely mapped reads.
+`We decide to use this to get XT:A:U tag in combination with MapQ >= 1 to get uniquely mapped reads for SE and PE`.
+	
+###### For bowtie
+Use `-m 1` to only report uniquely mapped reads, and use shell extract autosome mapped reads.
 
-##### sort by name
+###### sort by name
  samtools sort -n <in.bam> <byname.bam>
-##### fix the mate info
+###### fix the mate info
  samtools sort fixmate <byname.bam> <byname.fixed.bam>
-##### sort by genomic coordinate
+###### sort by genomic coordinate
  samtools sort <byname.fixed.bam> <out.bam>
-
 
 ### Prototype  Features
 

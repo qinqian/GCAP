@@ -155,7 +155,7 @@ def DHS_doc(input = {"json": "", "tex": ""}, output = {"latex": ""}, param = {"r
 
 def reads_doc(input = {"tex": "", #"json": "",
                        "json_autosome": ""},
-              output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": ""}):
+              output = {"raw": "", "mapping": ""}, param = {"seq_type": "", "reps": "", "samples": "", "tool": ""}):
     """
     these values will be replaced by Jim's codes,
     currently by bowtie and fastqc,
@@ -195,6 +195,7 @@ def reads_doc(input = {"tex": "", #"json": "",
         param = {"section_name": "mapping",
                  "render_dump": output["mapping"],
                  "map": mapped_rate, "combo": count_in_million(sum(mapped_number)),
+                 "tool": param["tool"],
                  "reps": param["reps"]})
 
     template_dump(mapping_latex)

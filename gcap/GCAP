@@ -411,9 +411,11 @@ def _reads_mapping(workflow, conf):
 
     ## filter mitochondria, chrX, chrY tags
     if not conf.seq_type.startswith("bed"):
-        uniq_tag = resource_filename("gcap", "pipeline-scripts/uniq_map_exclude_chrM.sh")
+        if conf.maptool == "bowtie":
+            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
+        else:
+            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
         for target in conf.treatment_targets:
-            ## TODO: bowtie and bwa specifically shell script
             attach_back(workflow, ShellCommand(
                 "{tool} -f {param[script]} {input[sam]} > {output[count]}",
                 tool = "awk",
@@ -433,7 +435,8 @@ def _reads_mapping(workflow, conf):
                       "mapping": conf.latex_prefix + "mapping.tex"},
             param = {"seq_type": conf.seq_type,
                      "reps": len(conf.treatment_pairs),
-                     "samples": conf.treatment_bases}))
+                     "samples": conf.treatment_bases,
+                     "tool": conf.maptool}))
 
         ## convert to BAM file
         for n, target in enumerate(conf.treatment_targets):
@@ -1012,7 +1015,7 @@ def _macs2_on_reps(workflow, conf):
         suffix = "_5M.bed"
     else:
         kind = ".bam"
-        suffix = "_5M.bam"
+        suffix = "_5M_sort.bam"
 
     for target in conf.treatment_targets:
         ## keep all duplicate tags as hotspot
