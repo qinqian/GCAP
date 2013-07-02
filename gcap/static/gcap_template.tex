@@ -138,16 +138,16 @@
 %- if section_name == "peaks_calling"
   \midrule
 %- if reps >= 2
-  Peak Calls Sample(5M) & Hotspot & \VAR{spot_5M | join(' & ')} & \\
+  Peak Calls Sample(5M) & \VAR{tool} & \VAR{spot_5M | join(' & ')} & \\
 %- else
-  Peak Calls Sample(5M) & Hotspot & \VAR{spot_5M | join(' & ')}  \\
+  Peak Calls Sample(5M) & \VAR{tool} & \VAR{spot_5M | join(' & ')}  \\
 %- endif
 
  \midrule
 %- if reps >= 2
- Peak Calls Combo(All) & Peaks FDR 1\% & \VAR{peaks_all | join(' & ')} & \VAR{combo}\\
+ Peak Calls Combo(All) & \VAR{tool} Peaks FDR 1\% & \VAR{peaks_all | join(' & ')} & \VAR{combo}\\
 %- else
- Peak Calls Combo(All) & Peaks FDR 1\% & \VAR{peaks_all | join(' & ')}  \\
+ Peak Calls Combo(All) & \VAR{tool} Peaks FDR 1\% & \VAR{peaks_all | join(' & ')}  \\
 %- endif
 %- endif
 

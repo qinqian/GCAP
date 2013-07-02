@@ -308,9 +308,10 @@ def get_size(rscript):
                 values["minus"] = line
             if line.startswith("x <- "):
                 values["x"] = line
-            if line.startswith("altd"):
-                frag_size = re.findall("c\((.*\d+.+)\)", line)
-                values["frag"] = frag_size[0].split(",")
+            if line.startswith("xcorr"):
+                values['xcorr'] = line
+            if line.startswith("ycorr"):
+                values['ycorr'] = line
     return values
 
 def stat_frag_std(input = {"r": "", "insert": ""}, output = {"json": "", "r": ""}, param = {"samples": "", "frag_tool": ""}):
@@ -322,15 +323,18 @@ def stat_frag_std(input = {"r": "", "insert": ""}, output = {"json": "", "r": ""
             with open(rout, 'w') as f:
                 f.write(values['positive'])
                 f.write(values['minus'])
+                f.write(values['xcorr'])
+                f.write(values['ycorr'])
+                f.write("xcorr.max = xcorr[which(ycorr==max(ycorr))]\n")
                 f.write(values['x'])
                 f.write("p.expect = sum(x * p/100) \n")
                 f.write("m.expect = sum(x * m/100) \n")
                 f.write("p.sd = sqrt(sum(((x-p.expect)^2)*p/100)) \n")
                 f.write("m.sd = sqrt(sum(((x-m.expect)^2)*m/100)) \n")
-                f.write("cat(paste((p.sd + m.sd)/2, '\n')) \n")
+                f.write("cat(paste((p.sd + m.sd)/2, '\t', xcorr.max)) \n")
 
-            std = os.popen("Rscript %s" % rout).read().strip()
-            json_dict["stat"][s] = "mean %s, sd %s" % (max(map(int, values["frag"])), int(float(std)))
+            std_frag = os.popen("Rscript %s" % rout).read().strip().split()
+            json_dict["stat"][s] = "mean %s, sd %s" % (int(float(std_frag[1])), int(float(std_frag[0])))
 
     elif param["frag_tool"] == "picard":
         for i, s in zip(input["insert"], param["samples"]):
