@@ -383,11 +383,13 @@ def _bwa(workflow, conf):
     elif conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
                 attach_back(workflow, ShellCommand(
-                    "{tool} aln {input[index]} {input[fastq]} > {output[sai]}",
+                    "{tool} aln -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
                     tool = "bwa",
                     input = {"index": conf.get("lib", "genome_index"),
                              "fastq": raw},
-                    output = {"sai": target + ".sai"}))
+                    output = {"sai": target + ".sai"},
+                    param = {"threads": 4}
+                ))
                 attach_back(workflow, ShellCommand(
                     "{tool} samse {input[index]} {input[sai]} {input[fastq]} > {output[sam]}",
                     tool = "bwa",
@@ -643,12 +645,15 @@ def _hotspot_on_replicates(workflow, conf):
     if conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
         ty = conf.seq_type.split(",")[1].strip().lower()
         kind = ".bam"
+        suffix = "_5M_sort.bam"
     elif conf.seq_type.startswith("bed"):
         ty = "bed"
         kind = "_all.bed"
+        suffix = "_5M.bed"
     else:
         ty = conf.seq_type
         kind = ".bam"
+        suffix = "_5M_sort.bam"
 
     for i, target in enumerate(conf.treatment_targets):
         ## prepare input for hotspot, get mappable tags and starch into output directory
@@ -729,7 +734,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + kind,
+                    input = target + suffix,
                     output = {"starch": target + "_5M.bed.starch", "loc_count": target + "_5M.bed.starch.loc_count",
                               "uniq_loc": target + "_5M.bed.starch.uniq_loc"},
                     param = {"type": ty}))
@@ -738,7 +743,7 @@ def _hotspot_on_replicates(workflow, conf):
                 ShellCommand(
                     "{tool} {input} {output[starch]} {param[type]}",
                     tool = "tags.sh",
-                    input = target + kind,
+                    input = target + suffix,
                     output = {"starch": target + "_5M.bed.starch"},
                     param = {"type": ty}))
 
@@ -1485,8 +1490,8 @@ def prepare_clean_up(workflow, conf):
     package all the necessary results and delete temporary files
     preserve bed, bigwiggle, starch, bam and pdf report
     """
-    p_list = ['*.bam', '*.xls', '*_summits.bed', '*_peaks.bed', '*.bw', '*treat*.bed.starch',  "*final",
-              '*.R', 'json', '*_treat*-both-passes', '*latex', "*.conf", "*report.tex", "*report.pdf"]
+    p_list = ['*.xls', '*_summits.bed', '*_peaks.bed', '*.bw', '*treat*.bed.starch',  "*final",
+              'json', '*_treat*-both-passes', "*.conf", "*report.tex", "*report.pdf"]
 
     p_pattern = [os.path.join(conf.target_dir, p) for p in p_list]
 
