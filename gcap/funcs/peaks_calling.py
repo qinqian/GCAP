@@ -11,7 +11,7 @@ __author__ = 'qinqianhappy'
 # 7. calculate naive library complexity by awk for BED reads input
 #
 ###############################################################
-from gcap.funcs.reps_quality import _peaks_reps_preprocess, _peaks_reps_evaluating
+from gcap.funcs.reps_quality import peaks_reps_preprocess, peaks_reps_evaluating
 from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 from gcap.funcs.helpers import *
@@ -30,19 +30,16 @@ def call_peaks(workflow, conf, tex):
         _hotspot_on_replicates(workflow, conf, tex)
     elif conf.peakcalltool == "macs2":
         _macs2_on_reps(workflow, conf, tex)
+    ## filter replicates hotspot regions or macs2 peaks regions
+    peaks_reps_preprocess(workflow, conf)
     if have_treat_reps:
-        ## filter replicates hotspot regions
-        _peaks_reps_preprocess(workflow, conf)
-
         ## evaluate replicates consistency
-        _peaks_reps_evaluating(workflow, conf, tex)
-
+        peaks_reps_evaluating(workflow, conf, tex)
         ## peaks calling on merged reads files
         if conf.peakcalltool == "hotspot":
             _hotspot_combo(workflow, conf)
         elif conf.peakcalltool == "macs2":
             _macs2_on_combo(workflow, conf)
-
     ## render peaks information to latex
     _peaks_calling_latex(workflow, conf, tex)
 

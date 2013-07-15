@@ -12,7 +12,7 @@ from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 from gcap.funcs.helpers import *
 
-def _peaks_reps_preprocess(workflow, conf):
+def peaks_reps_preprocess(workflow, conf):
     """
     remove blacklist and outlier for hotspot b
     """
@@ -112,7 +112,7 @@ def reps_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {}
 
     template_dump(rep_latex)
 
-def _peaks_reps_evaluating(workflow, conf, tex):
+def peaks_reps_evaluating(workflow, conf, tex):
     ## use 5M reads hotspot filtered regions for evaluation, intersect region ratio in pairwise ways to calculate I/U
     for i in range(len(conf.treatment_targets)):
         for j in range(i+1, len(conf.treatment_targets)):

@@ -21,7 +21,7 @@ from gcap.funcs.mapping import lib_contamination, reads_mapping
 from gcap.funcs.sequence_quality import *
 
 from pkg_resources import resource_filename
-from gcap.funcs.union_dhs_overlap import _union_DHS_overlap
+from gcap.funcs.union_dhs_overlap import union_DHS_overlap
 
 def parse_args(args=None):
     """
@@ -186,7 +186,8 @@ def create_workflow(args, conf, tex):
     #        bld.build(_promoter_overlap)
     #        bld.build(_conservation)
     if has_dhs and need_run(8):
-        bld.build(_union_DHS_overlap)
+        bld.build(union_DHS_overlap)
+
     if need_run(9):
         bld.build(report)
     return workflow

@@ -9,7 +9,7 @@ from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 from gcap.funcs.helpers import *
 
-def _union_DHS_overlap(workflow, conf, tex):
+def union_DHS_overlap(workflow, conf, tex):
     """ use hotspot d narrow peaks for DHS evaluation """
     for i, target in enumerate(conf.treatment_targets):
         if conf.peakcalltool == "hotspot":
