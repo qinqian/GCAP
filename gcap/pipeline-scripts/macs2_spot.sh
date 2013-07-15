@@ -3,7 +3,7 @@
 #########################################################
 #
 # Compute SPOT (Signal Portion Of Tags) metric for MACS2
-# A little strange
+#
 #########################################################
 
 if [ $# -lt 2 ];then
@@ -19,11 +19,36 @@ thisscr="macs2_spot.sh"
 echo
 echo $thisscr
 
-ntag=`unstarch $tags | wc -l | cut -d" " -f2`
+# Check tags for proper naming.
+test=$(echo $tags | grep "\.bam$")
+if [ ${#test} != 0 ]; then
+    bam=T
+else
+    test=$(echo $tags | grep "\.bed\.starch$")
+    if [ ${#test} != 0 ]; then
+	bam=F
+    else
+	echo "$thisscr: $tags must end in .bam or .bed.starch"
+	exit
+    fi
+fi
+
+proj=`echo $tags | sed s/\.bam$// | sed s/\.bed$//`
+
+if [ $bam == "T" ]; then
+    bamToBed -i $tags \
+        | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
+        | sort-bed - > ${proj}_tags.bed
+else
+    cat $tags \
+        | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
+        | sort-bed - > ${proj}_tags.bed
+
+ntag=`unstarch ${proj}_tags.bed | wc -l | cut -d" " -f2`
 
 out=${peaks}.spot.out
 
-tih=$(unstarch $tags | bedops -e -1 - $peaks | wc -l)
+tih=$(cat ${proj}_tags.bed | bedops -e -1 - $peaks | wc -l)
 
 spot=$(echo "scale=4; $tih/$ntag" | bc)
 

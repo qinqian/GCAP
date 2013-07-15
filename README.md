@@ -41,15 +41,16 @@ Add binary to PATH and download `hg19, mm9, rn4` index for bowtie and bwa mappin
 
 Install bwa reads mapping tool, bwa is used for reads mapping evaluation only, which needs corresponding species index, default: 4 threads.
 
-##### install Hotspot
+##### Install Hotspot v4
 
 * Hotspot default setting is used
 * Download hotspot v3 from <http://www.uwencode.org/proj/hotspot/>, get the hotspot5, wavelets, wavePeaks into `$PATH`, you may need to compile from hotspot-deploy directory
 * Download `CHROM FILE` and `_MAPPABLE_FILE_` for your species and reads length
+* fill in the `_OMIT_Region` in conf files
 
 No matter it's SE or PE data, we take 5' tags for hotspot peaks calling.
 
-NOTE on hotspot output: 
+<!--NOTE on hotspot v3 output: 
 	
 	SPOT score is calculated by *-both-passes/*hotspot.twopass.zscore.wig
 	*-both-passes/*.twopass.merge150.wgt10.zgt2.wig minimally thresholded hotspots
@@ -58,7 +59,9 @@ NOTE on hotspot output:
 	take the encode 2 mouse data as an example.
 	
 	The following encode_mouse_treat_rep1 is the prefix.
-	a.  This is top 10 of the loose hotspot regions encode_mouse_treat_rep1.hotspot.twopass.zscore.wig( totally 303941 regions ), which is used for SPOT score calculation.chr1    3322171 3322200 2.148710
+	a.  This is top 10 of the loose hotspot regions encode_mouse_treat_rep1.hotspot.twopass.zscore.wig( totally 303941 regions ), which is used for SPOT score calculation.
+
+	chr1    3322171 3322200 2.148710
 	chr1    3346446 3346569 2.896090
 	chr1    3359049 3359208 3.776190
 	chr1    3360959 3361032 2.148710
@@ -107,8 +110,15 @@ NOTE on hotspot output:
 	chr1    3543180 3543330 .       25.515625
 	chr1    3576620 3576770 .       16.453125
 	chr1    3595820 3595970 .       47.406250
-	chr1    3601420 3601570 .       9.750000
+	chr1    3601420 3601570 .       9.750000-->
+	
+In hotspot v4, after `clean` up	, the final results are :
 
+	*.hot.bed           minimally thresholded hotspots( corresponding to hotspot v3 b, broad Peak)
+	*.fdr0.01.hot.bed       FDR thresholded hotspots  ( corresponding to hotspot v3 c) 
+	*.fdr0.01.pks.bed       FDR thresholded peaks     ( corresponding to hotspot v3 d, narrow Peak) 
+	tag.density.starch  20 bp resolution, converted to bigwiggle
+	macs2 bigwiggle 100 bp resolution default
 	
 ##### install phantompeakqualtools
 *site* <https://code.google.com/p/phantompeakqualtools/>
@@ -171,7 +181,7 @@ then, convert to bigBed:
 
 ##### fragment size tools
 
-Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating: 
+Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating and sampling reads BED file: 
 
 	git clone https://github.com/taoliu/MACS/
 	or 
@@ -289,7 +299,7 @@ SAM Files, original mapping results with headers , if you only have `bam` files,
 	
 	If you want all SAM files have uniform mapping parameters, you could convert SAM to fastq by samtools view -bt and bamToFastq, then follow up our fastq schemes.
 
-reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with this format):
+reads BED(converted by bedtools from BAM, sometimes GEO only preserve data with this format) or bed.starch:
      
     As our proposals is based on sampling raw reads, including mappable and unmappable reads, BED reads files(BED with 6 fields) do not have unmappable information, so this format is added only for analysis of the rest criteria. As bedToBam could only process SE bed data, PE would be regarded as SE, too. We take all BED format data as SE data, we sample down BED mappable reads 5M for comparison. Change sequence_type to `bed`. This is used for internal data comparison now.
     
@@ -362,7 +372,7 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 
   
 #### Tips 
-`Update`:  extract Top 100k or 5M reads from bam, sam or fastq instead sampling.
+`Update`: use fastqStatsAndSubsample  sampleBam implemented by Jim Kent.
 
 <!--- We use built-in function to do raw reads sampling from PE and SE FASTQ(default) .
 - Python function to sample reads from PE and SE SAM(BAM converted SAM) files， including `mappable and unmappable reads`.(default for SAM and BAM)
@@ -416,9 +426,9 @@ Use `-m 1` to only report uniquely mapped reads, and use shell extract autosome 
 ### Prototype  Features
 
 1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
-2. reads mapping(exclude mitochrondrial mapping reads) and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
+2. reads mapping(exclude mitochrondrial, X, Y mapping reads) and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
 3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
-4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads, Peaks for all reads, that is, use `b, d`.
+4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads(broad Peak), Peaks for all reads(narrow Peak), that is, use `b, d`.
 5. estimate library complexity/redundancy by 5M reads(census;picard, Markduplicates; macs2 filterdup; awk)
 6. Add RSC / NSC to QC with SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
 7. estimate replicates consistency by

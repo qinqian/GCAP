@@ -21,7 +21,7 @@ rangepad=$((bins/2-step/2))
 libd=_OUTDIR_
 
 # Output location; full path
-pksdir=_OUTDIR_
+outdir=_OUTDIR_
 
 # Do peak-finding genome-wide.
 chrfile=_CHROM_FILE_
@@ -32,8 +32,6 @@ chkchr=_CHKCHR_
 ## Wavelet smooth level.
 lvl=_PKFIND_SMTH_LVL_
 
-tmpd=/tmp
-
 thisd=`pwd`
 thisscr=$0
 echo
@@ -42,11 +40,11 @@ echo $thisscr
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
 tagsb=$libd/$proj.bed.starch
 
-outdir=$pksdir/$proj-peaks
-mkdir -p $outdir
+pdir=$outdir/$proj-peaks
+mkdir -p $pdir
 
 ## Check if already exists
-pk=$outdir/$proj.peaks.bed
+pk=$pdir/$proj.peaks.bed
 if [ $check == "T" ] && [ -e $pk ]; then
     test=`grep $chkchr $pk | head -1`
     if [ ${#test} != 0 ]; then 
@@ -56,8 +54,10 @@ if [ $check == "T" ] && [ -e $pk ]; then
 fi
 
 ## Check if density file exists.
-## If directory, create expected file name
-if [ -d $dens ]; then
+## If directory or blank, create expected file name
+if [ ${#dens} == 0 ]; then
+    dens=$pdir/$proj.tagdensity.bed.starch
+elif [ -d $dens ]; then
     dens=$dens/$proj.tagdensity.bed.starch
 fi
 
@@ -69,11 +69,6 @@ if [ ! -e $dens ] || [ -z $dens ]; then
 	exit 1
     fi
 
-    ## With advent of bedops 2.0, we won't have to uncompress tags to
-    ## tmp file, and can use the tags starch file directly in the
-    ## bedmap command.
-    tmptags=$tmpd/$(basename $tagsb).tmp.bed
-    unstarch $tagsb > $tmptags
     sort-bed $chrfile \
 	| awk -v b=$bins -v s=$step \
 	'BEGIN {OFS="\t"; hs=s/2; hb=b/2} ; { \
@@ -81,11 +76,9 @@ if [ ! -e $dens ] || [ -z $dens ]; then
                  print $1, start, start+s, "."; \
                } \
              }' - \
-	| bedmap --range $rangepad --delim "\t" --echo --count - $tmptags \
+	| bedmap --range $rangepad --delim "\t" --echo --count - $tagsb \
 	| starch - \
         > $dens
-    rm $tmptags
-    
 fi
 
 $pkfind $dens $lvl $chrfile \

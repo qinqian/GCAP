@@ -18,9 +18,7 @@ the distribution).
 # python modules
 # ------------------------------------
 
-import sys
-import re
-from gcap.FeatIO import PeakIO
+from gcap.funcs.FeatIO import PeakIO
 
 # ------------------------------------
 # constants

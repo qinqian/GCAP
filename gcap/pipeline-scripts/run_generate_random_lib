@@ -6,11 +6,11 @@ chrfile=_CHROM_FILE_
 K=_K_
 gnom=_GENOME_
 umap=_MAPPABLE_FILE_
-umap10kb=$(basename $umap).counts.10kb
+outdir=_OUTDIR_
+umap10kb=$outdir/$(basename $umap).counts.10kb
 randir=_RANDIR_
 seed=_SEED_
 dupok=_DUPOK_
-libd=_OUTDIR_
 
 # List of tags files.  Bam format, extension .bam
 tags=_TAGS_
@@ -26,9 +26,9 @@ echo $thisscr
 ## Get tag counts.
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
 if [ $dupok == "T" ]; then
-    lib=$libd/$proj.lib.filter.txt
+    lib=$outdir/$proj.lib.filter.txt
 else
-    lib=$libd/$proj.lib.filter.nodup.txt
+    lib=$outdir/$proj.lib.filter.nodup.txt
 fi
 if [ -e $lib.counts ]; then
     ntag=`cat $lib.counts`

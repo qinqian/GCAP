@@ -11,10 +11,8 @@ echo $thisscr
 gnom=_GENOME_
 
 tags=_TAGS_
-libd=_OUTDIR_
 
 umap=_MAPPABLE_FILE_
-umap10kb=$thisd/`basename $umap`.counts.10kb
 hotspot=_HOTSPOT_
 check=_CHECK_
 chkchr=_CHKCHR_
@@ -29,6 +27,8 @@ outdir=_OUTDIR_
 rand=_RANDIR_
 # Location of random tags bed and lib files
 rantagd=_RANDIR_
+
+umap10kb=$outdir/`basename $umap`.counts.10kb
 
 # Hotspot window parameters
 winMin=_WIN_MIN_
@@ -51,7 +51,7 @@ randrs=""
 rantags=""
 
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
-tagsb[0]=$libd/$proj.bed.starch
+tagsb[0]=$outdir/$proj.bed.starch
 drs="$outdir/$proj"
 ntag=`cut -d" " -f2 $outdir/$proj-pass1/*.stdout`
 ntag=$((($ntag+50000)/100000))00000
@@ -91,12 +91,12 @@ do
     libbed=$proj.pad.nohotspot.lib.bed
     lib=$proj.pad.nohotspot.lib.txt
 
-    ## Take 50kb window on either side of each hotspot, 
+    ## Take background window-sized interval on either side of each hotspot, 
     ## merge,
     ## subtract off the hotspots,
     ## intersect with the mappable regions of the genome.
     echo "generating 50kb pad set..."
-    bedops --header --range 50000 -m $hot \
+    bedops --header --range $backgrdWin -m $hot \
         | bedops --header -d - $hot \
         | bedops -i - $umap \
         > $padbed

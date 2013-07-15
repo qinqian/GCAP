@@ -10,8 +10,9 @@ check=_CHECK_
 umap=_MAPPABLE_FILE_
 chrfile=_CHROM_FILE_
 chroms=$(cut -f1 $chrfile)
+outdir=_OUTDIR_
 
-umap10kb=$(basename $umap).counts.10kb
+umap10kb=$outdir/$(basename $umap).counts.10kb
 
 bins=10000
 
@@ -23,6 +24,7 @@ fi
 for chr in $chroms
 do
     coords=$(grep -e $chr$ $chrfile)
+
     echo $coords \
 	| awk -v b=$bins \
 	'BEGIN {OFS="\t"} ; { \

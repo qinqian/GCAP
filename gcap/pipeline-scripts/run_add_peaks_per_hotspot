@@ -10,7 +10,7 @@ gnom=_GENOME_
 tags=_TAGS_
 
 # Location of genome-wide peaks
-pksdir=_OUTDIR_
+outdir=_OUTDIR_
 
 # Location of hotspot results
 hotdir=_OUTDIR_
@@ -37,13 +37,27 @@ echo
 echo $thisscr
 
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
+pdir=$outdir/$proj-peaks
+
 ## If density is a directory, create expected file name
-if [ -d $dens ]; then
+if [ ${#dens} == 0 ]; then
+    dens=$pdir/$proj.tagdensity.bed.starch
+elif [ -d $dens ]; then
     dens=$dens/$proj.tagdensity.bed.starch
 fi
 
+dentype=${dens##*.}
+
+if [ $dentype == "starch" ]; then
+    uncompr=unstarch
+elif [ $dentype == "jarch" ]; then
+    uncompr=gchr
+else
+    uncompr="cat"
+fi
+
 ## Check genome-wide output.
-pk=$pksdir/$proj-peaks/$proj.peaks.bed
+pk=$pdir/$proj.peaks.bed
 if [ ! -e $pk ]; then
     echo "$thisscr: $pk does not exist; Check results. Skipping"
     ((i++))
@@ -83,8 +97,8 @@ do
     fi
     tout=$outd/$proj.hotspot.twopass.fdr$fdr.merge.pks.tmp.bed
     tmpdom=$outd/$proj.hotspot.twopass.fdr$fdr.merge.nopkhot.tmp.bed
-    awk '(NR>1)' $wig | bedops -e -1 $pk - > $tout
-    awk '(NR>1)' $wig | bedops -n -1 - $pk > $tmpdom
+    bedops --header -e -1 $pk $wig > $tout
+    bedops --header -n -1 $wig $pk > $tmpdom
 
 
     ## If the original peakset intersects every element of the domain,
@@ -99,7 +113,7 @@ do
 	    echo "$thisscr: error: $dens does not exist; run run_wavelet_peak_finding to generate."
 	    exit 1
 	fi
-	unstarch $dens \
+	$uncompr $dens \
 	    | bedmap --delim ";" --echo-map --max $tmpdom - \
 	    | awk 'BEGIN{FS=";"}{max=$NF; i=1; go=1; while(i<NF && go==1){split($i, a, "\t"); if(a[5] == max){print $i; go=0}; i++}}' \
 	    | awk -v sz=$halfHSS 'BEGIN {FS="\t";OFS=FS} {d=int(($2+$3)/2); e=d-sz; if ( e < 0 ) { e = 0; } print $1, e, d+sz, $4, int($5)}' \

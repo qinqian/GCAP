@@ -9,9 +9,8 @@ echo $thisscr
 gnom=_GENOME_
 
 tags=_TAGS_
-
-umap=_MAPPABLE_FILE_
-umap10kb=$thisd/`basename $umap`.counts.10kb
+useinput=_USE_INPUT_
+tagsInput=_INPUT_TAGS_
 
 thresh=_THRESH_
 minSize=_MINSIZE_
@@ -22,7 +21,10 @@ chkchr=_CHKCHR_
 # Output location; full path
 outdir=_OUTDIR_
 # Location of random hotspots; full path
-rand=_RANDIR_
+randir=_RANDIR_
+
+umap=_MAPPABLE_FILE_
+umap10kb=$outdir/`basename $umap`.counts.10kb
 
 # Hotspot window parameters
 backgrdWin=_BACKGRD_WIN_
@@ -34,9 +36,9 @@ fdrs=_FDRS_
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
 drs="$outdir/$proj"
 ntag=`cut -d" " -f2 $outdir/$proj-pass1/*.stdout`
-ntag=$((($ntag+50000)/100000))00000
+ntagr=$((($ntag+50000)/100000))00000
 if [ "$fdrs" != "N" ]; then
-    drs="$drs $rand/$ntag-ran"
+    drs="$drs $randir/$ntagr-ran"
 fi
 
 if [ ! -e $umap10kb ]; then
@@ -92,14 +94,36 @@ do
       	| sort-bed - \
       	| grep -vi inf \
       	| grep -vi nan \
-        | tee tmp.bed \
-        | cut -f1-5 - \
-      	> hotspot.both.passes.cluster.counts.bed
+        > tmp.bed
+    if [ $useinput == "T" ] && [ $dir != "$randir/$ntagr-ran" ]; then
+	projInput=`basename $tagsInput | sed s/\.bam$// | sed s/\.bed.starch$//`
+	tagsInputB=$outdir/$projInput.bed.starch
+	if [ ! -e $tagsInputB ]; then
+	    echo "$thisscr: input tags bed file $tagsInputB does not exist; run run_make_lib to generate..."
+	    exit 1
+	fi
+	echo "$thisscr: subtracting input tags..."
+	ntagsInput=$(unstarch --elements $tagsInputB)
+	scalef=`echo "scale=5; $ntag/$ntagsInput" | bc`
+	bedmap --delim "\t" --echo --count tmp.bed $tagsInputB \
+	    | awk -v s=$scalef '{n=int($5 - $8*s); if(n<0) n=0; print $1"\t"$2"\t"$3"\t"$4"\t"n}' - \
+	    > hotspot.both.passes.cluster.counts.bed
+    else
+        cut -f1-5 tmp.bed \
+      	    > hotspot.both.passes.cluster.counts.bed
+    fi
     cut -f6-7 tmp.bed > hotspot.start.stop.txt
     ## Left and right flank files.
     awk -v pad=$backgrdWinHalf '{left=$2-pad; if(left < 0) left = 0; print $1"\t"left"\t"$2}' hotspot.both.passes.cluster.counts.bed > left.flank.bed
     awk -v pad=$backgrdWinHalf '{print $1"\t"$3"\t"$3+pad}' hotspot.both.passes.cluster.counts.bed > right.flank.bed
-    ## Counts of background tags in each flanking region.
+    ## Counts of background tags in each flanking region. Note: in
+    ## contrast with the hotspot tag counts, we do not adjust the
+    ## flanking region tags if there is input.  This makes our
+    ## z-scores conservative.  Also, in a scenario where signal and
+    ## input tags are very similar across a hotspot *and* flanking
+    ## regions, subtracting input across the hotspot and flanking
+    ## regions would result in an inappropriately high hotspot z-score
+    ## if the signal tags are just very slightly enriched over input.
     bedmap --count left.flank.bed $libbed \
       	> left.flank.bgtags.txt
     bedmap --count right.flank.bed $libbed \

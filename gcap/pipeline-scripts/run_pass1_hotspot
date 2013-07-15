@@ -10,18 +10,10 @@ gnom=_GENOME_
 
 tags=_TAGS_
 
-# Location of hotspot input lib and bed.jarch files corresponding to
-# the tags files; full path
-libd=_OUTDIR_
-
 # Chromosome start, stop positions
 chroms=_CHROM_FILE_
 # Hotspot binary
 hotspot=_HOTSPOT_
-
-# A count of uniquely-mappable bases in 10kb intervals, used for background calculations in hotspot
-umap=_MAPPABLE_FILE_
-umap10kb=$thisd/$(basename $umap).counts.10kb
 
 # Duplicate tags OK?  (Set to T if yes - for DNaseI data, for instance; anything else - for ChIP, for instance - means no.)
 dupok=_DUPOK_
@@ -29,10 +21,14 @@ dupok=_DUPOK_
 # Location of random tags lib files; full path
 rantagd=_RANDIR_
 # Location of random hotspots; full path
-rand=_RANDIR_
+randir=_RANDIR_
 
 # Output location; full path
 outdir=_OUTDIR_
+
+# A count of uniquely-mappable bases in 10kb intervals, used for background calculations in hotspot
+umap=_MAPPABLE_FILE_
+umap10kb=$outdir/$(basename $umap).counts.10kb
 
 # Check if these results have already been computed?
 check=_CHECK_
@@ -60,9 +56,9 @@ mpblgenome=`awk '{t+=$3}END{print t}' $umap10kb`
 
 proj=`basename $tags | sed s/\.bam$// | sed s/\.bed.starch$//`
 if [ $dupok == "T" ]; then
-    lib=$libd/$proj.lib.filter.txt
+    lib=$outdir/$proj.lib.filter.txt
 else
-    lib=$libd/$proj.lib.filter.nodup.txt
+    lib=$outdir/$proj.lib.filter.nodup.txt
 fi
 if [ ! -e $lib ]; then
     echo "$thisscr: error: $lib does not exist; needs to be generated" 1>&2
@@ -88,7 +84,7 @@ if [ "$fdrs" != "N" ]; then
     if [ ! -e $ranlib ]; then
 	echo "$thisscr: warning: $ranlib does not exist; may need to be generated" 1>&2
     else
-	drs="$drs $rand/$ntag-ran"
+	drs="$drs $randir/$ntag-ran"
 	libs[1]=$ranlib
     fi
 fi

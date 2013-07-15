@@ -20,13 +20,11 @@ the distribution).
 
 import os
 import sys
-import re
 import logging
-import subprocess
 import math
 from optparse import OptionParser
 
-from gcap import BedIO
+import gcap.funcs.BedIO
 
 try:
     from bx.bbi.bigwig_file import BigWigFile

@@ -1,5 +1,7 @@
 from configparser import ConfigParser, NoSectionError, NoOptionError
 import os
+
+
 class NoTreatmentData(Exception):
     pass
 
@@ -64,17 +66,26 @@ class Conf(object):
         return os.path.join(self.category("latex"), self.id)
 
     @property
-    def hotspot_merge_both_passes_prefix(self):
-        return os.path.join(self.prefix + "_merge_all-both-passes", self.id)
-
-
-    @property
-    def hotspot_reps_both_passes_prefix(self):
-        return [ os.path.join(f + "-both-passes", self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
+    def hotspot_merge_final_prefix(self):
+        return os.path.join(self.prefix + "_merge_final", self.id)
 
     @property
-    def hotspot_reps_both_passes_5M_prefix(self):
-        return [ os.path.join(f + "_5M-both-passes", self.id + "_treat_rep" + str(i+1) + "_5M") for i, f in enumerate(self.treatment_targets) ]
+    def hotspot_reps_final_prefix(self):
+        return [ os.path.join(f + "-final", self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
+
+    @property
+    def hotspot_reps_final_5M_prefix(self):
+        return [ os.path.join(f + "_5M-final", self.id + "_treat_rep" + str(i+1) + "_5M") for i, f in enumerate(self.treatment_targets) ]
+
+    @property
+    def hotspot_starch_input(self):
+        """ bed.starch should have a different directory from output """
+        return [ os.path.join(self.category("hotspot_starch_input"), self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
+
+    @property
+    def hotspot_merge_starch(self):
+        """ bed.starch should have a different directory from output """
+        return os.path.join(self.category("hotspot_starch_input"), self.id)
 
     @property
     def treatment_pairs(self):

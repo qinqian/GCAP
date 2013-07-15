@@ -1,8 +1,12 @@
 #! /bin/bash
 
+#############################################################
+# Modified runhotspot for better integration
+#############################################################
+
 if [ $# -lt 4 ];then
     echo `basename $0` "config for hotspot"
-    echo "Need 1 parameters now: <pipeDir> <tokenFile> <output>"
+    echo "Need 1 parameters now: <pipeDir> <tokenFile> <output> <omit_region_file>"
     exit 1
 fi
 
@@ -11,6 +15,7 @@ pipeDir=$1
 tokenFile=$2
 output=$3
 spot=$4
+omit=$5
 
 ## Do SPOT only (set _FDRS_ to "N" in runall.tokens.txt)
 # scripts="$pipeDir/run_make_lib
@@ -21,8 +26,9 @@ spot=$4
 #     $pipeDir/run_rescore_hotspot_passes
 #     $pipeDir/run_spot"
 
-## Do everything
-scripts="$pipeDir/run_make_lib
+## Do everything, including badspots and final cleanup
+scripts="$pipeDir/run_badspot
+    $pipeDir/run_make_lib
     $pipeDir/run_wavelet_peak_finding
     $pipeDir/run_10kb_counts
     $pipeDir/run_generate_random_lib
@@ -33,10 +39,8 @@ scripts="$pipeDir/run_make_lib
     $pipeDir/run_spot
     $pipeDir/run_thresh_hot.R
     $pipeDir/run_both-passes_merge_and_thresh_hotspots
-    $pipeDir/run_add_peaks_per_hotspot"
-
-
-
+    $pipeDir/run_add_peaks_per_hotspot
+    $pipeDir/run_final"
 
 cd $output
 $scriptTokBin \
@@ -44,6 +48,11 @@ $scriptTokBin \
     --output-dir=`pwd` \
     $tokenFile \
     $scripts
+
+if [ ${#omit} != 0 ];
+then
+    bash ./run_badspot.tok ## need omit satellite regions, not available for mm9 yet
+fi
 
 bash ./run_make_lib.tok
 bash ./run_wavelet_peak_finding.tok
@@ -62,5 +71,6 @@ fi
 Rscript ./run_thresh_hot.R.tok
 bash ./run_both-passes_merge_and_thresh_hotspots.tok
 bash ./run_add_peaks_per_hotspot.tok
+bash ./run_final.tok
 
 cd ..

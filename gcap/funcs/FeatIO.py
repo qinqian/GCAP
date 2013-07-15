@@ -19,8 +19,7 @@ import logging
 from array import array
 from math import sqrt
 from random import sample as random_sample
-
-from gcap.Func import std
+from math import sqrt
 
 # ------------------------------------
 # constants
@@ -32,6 +31,36 @@ __doc__ = "PeakIO, WigTrackI, FWTrackI and TrackI classes"
 # ------------------------------------
 # Misc functions
 # ------------------------------------
+def mean (nums):
+    """Calculate Mean.
+
+    Parameters:
+    nums:  list of numbers
+    Return Value:
+    mean value
+    """
+    return float(sum(nums))/len(nums)
+
+def std (nums,n_mean=None):
+    """Calculate unbias standard deviation.
+
+    Parameters:
+    nums:  list of numbers
+    Return Value:
+    std value
+    """
+    if not n_mean:
+        n_mean = mean(nums)
+    n = len(nums)
+    if n == 1:
+        return 0.0
+    variance = 0.0
+    for i in range(n):
+        tmp = (nums[i]-n_mean)
+        variance += (tmp*tmp)
+
+    variance /= n-1
+    return sqrt(variance)
 
 def cmp(a, b):
     return (a > b) - (a < b)
