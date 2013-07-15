@@ -14,7 +14,10 @@ from gcap.funcs.helpers import *
 ## bowtie command line for pair end and single end DNase
 def _bowtie(workflow, conf):
     """
-    Only all reads mapping, optionally
+    To increase mapping ratio
+    3 times mapping, take 50bp as example, step is controlled in the conf files:
+        1. 28 bp 2. 40bp 3. 50bp
+    ## TODO: Try to define proper mapping reads length level
     """
     if conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
@@ -45,8 +48,6 @@ def _bowtie(workflow, conf):
                            "max_align": 1,
                            "genome_index": conf.get_path("lib", "genome_index")}))
             bowtie.update(param = conf.items("bowtie"))
-    elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam") or conf.seq_type.startswith("bed"): ## skip mapping
-        pass
 
 ## default bwa command line for pair end and single end DNase
 def _bwa(workflow, conf):

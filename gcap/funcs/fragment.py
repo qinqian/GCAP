@@ -60,15 +60,15 @@ def fragment_size(workflow, conf, tex):
                     input = {"bam": target + "_5M_sort.bam"},
                     output = {"R": target + "_5M_model.R"},
                     param = {"prefix": target + "_5M"}))
-                ## extract standard deviation from MACS2 model.R,
-                ## use m, p, and pileup value for standard deviation; mean fragment size is provided(choose the one with highest correlation)
-                attach_back(workflow, PythonCommand(
-                    stat_frag_std,
-                    input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
-                    output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
-                    param = {"samples": conf.treatment_bases,
-                             "frag_tool": "macs2"}))
-
+            ## extract standard deviation from MACS2 model.R,
+            ## use m, p, and pileup value for standard deviation; mean fragment size is provided(choose the one with highest correlation)
+            attach_back(workflow, PythonCommand(
+                stat_frag_std,
+                input = {"r": [ target + "_5M_model.R" for target in conf.treatment_targets ]},
+                output = {"json": conf.json_prefix + "_frag.json", "r": [ target + "_5M_frag_sd.R" for target in conf.treatment_targets ] },
+                param = {"samples": conf.treatment_bases,
+                         "frag_tool": "macs2"},
+                name = "macs2 model R script parser"))
     elif conf.seq_type.startswith("bed"):
         for target in conf.treatment_targets:
             fragment_size = attach_back(workflow, ShellCommand(
