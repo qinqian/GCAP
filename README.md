@@ -213,10 +213,10 @@ Example:
 	
 	[Basis]
 	user = qinq
-	id = testid
+	id = sampled_pe_dnase
 	species = hg19
-	treat = rep_1_pair1, rep_1_pair2; rep_2_pair1, rep_2_pair2
-	output = results_path
+	treat = /mnt/Storage/home/qinq/projects/GCAP/data/hansen_test_data/resampled_pair_end/HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R1_001.fastq.subset.6.5M, /mnt/Storage/home/qinq/projects/GCAP/data/hansen_test_data/resampled_pair_end/HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R2_001.fastq.subset.6.5M; /mnt/Storage/home/qinq/projects/GCAP/data/hansen_test_data/resampled_pair_end/HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R1_001.fastq.subset, /mnt/Storage/home/qinq/projects/GCAP/data/hansen_test_data/resampled_pair_end/HL1_LNcap_DHT_50U_50_300bp_CTTGTA_L004_R2_001.fastq.subset
+	output = /mnt/Storage/home/qinq/projects/GCAP/results/pair_result_sampled/
 	read_length = 50
 	sequence_type = pe
 	
@@ -228,14 +228,17 @@ Example:
 	## correlation for genome or union DHS(filtered by blacklist)
 	cor = genome
 	#cor = union
+	
 	[census]
 	hist = /mnt/Storage/home/qinq/projects/GCAP/codes/census/bam_to_histo.py
 	calc = /mnt/Storage/home/qinq/projects/GCAP/codes/census/calculate_libsize.py
 	census_exclude = /mnt/Storage/home/qinq/projects/GCAP/codes/census/seq.cov005.ONHG19.bed
 	
-	[picard]sort = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/SortSam.jar
+	[picard]
+	sort = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/SortSam.jar
 	threads = 4
 	insertsize = /mnt/Storage/home/qinq/softwares/picard-tools-1.91/CollectInsertSizeMetrics.jar
+	
 	[lib]
 	genome_index = /mnt/Storage/home/qinq/lib/hg19.fa
 	## samtools view -bt chromosome length
@@ -262,16 +265,16 @@ Example:
 	[hotspot]
 	## get from http://www.uwencode.org/proj/hotspot/
 	chrom_info = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v3/data/hg19.chromInfo.bed
-	## if no corresponding reads length mappable regions, use chrom_info or build yourself
-	## another solution is to remove all repetitive or unmappble regions in your bam tags.
-	mappable_region = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v3/data/hg19.K50.mappable_only.bed 
+	mappable_region = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v3/data/hg19.K50.mappable_only.bed
 	fdrs = "0.01"
 	keep_dup = T
+	omit = /mnt/Storage/home/qinq/projects/GCAP/codes/hotspot-distr-v4/data/Satellite.hg19.bed
 	
 	[macs2]
 	species = hs
 	keep_dup = all
 	shiftsize = 50
+
 
 Instructions on the `conf` details.
 `Input Format`
