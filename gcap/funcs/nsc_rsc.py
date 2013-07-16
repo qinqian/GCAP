@@ -16,26 +16,25 @@ def strand_cor(workflow, conf, tex):
     Rscript run_spp.R -c=<tagAlign/BAMfile> -savp -out=<outFile>
     support BAM/SAM, fastq input
     """
-    if not conf.seq_type.startswith("bed"):
-        for target in conf.treatment_targets:
-            attach_back(workflow, ShellCommand(
-                "{tool} {param[spp]} -c={input[bam]} -savp -out={output}",
-                tool = "Rscript",
-                input = {"bam": target + "_5M_sort.bam"},
-                output = target + "_strand_cor",
-                param = {"spp": conf.get("tool", "spp")}))
-            ## add doc and json for NSC, RSC
-        attach_back(workflow, PythonCommand(
-            stat_strand_cor,
-            input = {"metric": [target + "_strand_cor" for target in conf.treatment_targets]},
-            output = {"json": conf.json_prefix + "_strand_cor.json"},
-            param = {"samples": conf.treatment_bases}))
-        attach_back(workflow, PythonCommand(
-            strand_cor_doc,
-            input = {"json": conf.json_prefix + "_strand_cor.json", "tex": tex},
-            output = {"nsc_latex": conf.latex_prefix + "_nsc.tex", "rsc_latex": conf.latex_prefix + "_rsc.tex"},
-            param = {"samples": conf.treatment_bases,
-                     "reps": len(conf.treatment_pairs)}))
+    for target in conf.treatment_targets:
+        attach_back(workflow, ShellCommand(
+            "{tool} {param[spp]} -c={input[bam]} -savp -out={output}",
+            tool = "Rscript",
+            input = {"bam": target + "_5M_sort.bam"},
+            output = target + "_strand_cor",
+            param = {"spp": conf.get("tool", "spp")}))
+        ## add doc and json for NSC, RSC
+    attach_back(workflow, PythonCommand(
+        stat_strand_cor,
+        input = {"metric": [target + "_strand_cor" for target in conf.treatment_targets]},
+        output = {"json": conf.json_prefix + "_strand_cor.json"},
+        param = {"samples": conf.treatment_bases}))
+    attach_back(workflow, PythonCommand(
+        strand_cor_doc,
+        input = {"json": conf.json_prefix + "_strand_cor.json", "tex": tex},
+        output = {"nsc_latex": conf.latex_prefix + "_nsc.tex", "rsc_latex": conf.latex_prefix + "_rsc.tex"},
+        param = {"samples": conf.treatment_bases,
+                 "reps": len(conf.treatment_pairs)}))
 
 def stat_strand_cor(input = {"metric": ""}, output = {"json": ""}, param= {"samples": ""}):
     """RSC NSC: COL9 COL10, COL3: estFragLen"""

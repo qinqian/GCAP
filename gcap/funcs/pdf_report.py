@@ -33,8 +33,9 @@ def report(workflow, conf, tex):
         collector.append(conf.latex_prefix + "len.tex")
         collector.append(conf.latex_prefix + "seq_quality.tex")
         collector.append(conf.latex_prefix + "_mapping.tex")
-    collector.append(conf.latex_prefix + "_nsc.tex")
-    collector.append(conf.latex_prefix + "_rsc.tex")
+        collector.append(conf.latex_prefix + "_nsc.tex")
+        collector.append(conf.latex_prefix + "_rsc.tex")
+
     collector.append(conf.latex_prefix + "_frag.tex")
     collector.append(conf.latex_prefix + "redun.tex")
     collector.append(conf.latex_prefix + "_peaks.tex")

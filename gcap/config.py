@@ -67,7 +67,7 @@ class Conf(object):
 
     @property
     def hotspot_merge_final_prefix(self):
-        return os.path.join(self.prefix + "_merge_final", self.id)
+        return os.path.join(self.prefix + "_merge_all-final", self.id)
 
     @property
     def hotspot_reps_final_prefix(self):
@@ -75,7 +75,7 @@ class Conf(object):
 
     @property
     def hotspot_reps_final_5M_prefix(self):
-        return [ os.path.join(f + "_5M-final", self.id + "_treat_rep" + str(i+1) + "_5M") for i, f in enumerate(self.treatment_targets) ]
+        return [ os.path.join(f + "_5M_sort-final", self.id + "_treat_rep" + str(i+1) + "_5M_sort") for i, f in enumerate(self.treatment_targets) ]
 
     @property
     def hotspot_starch_input(self):

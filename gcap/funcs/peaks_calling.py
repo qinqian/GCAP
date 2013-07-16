@@ -113,7 +113,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
 	*-final/tag.density.starch      20bp resolution, converted to bigwiggle
     """
     if conf.seq_type.startswith("bed"):
-        kind = "_all.bed.starch"
+        kind = "_all.bed"
         suffix = "_5M.bed.starch"
     else:
         kind = ".bam"
@@ -131,6 +131,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
                               "starch": conf.hotspot_starch_input[i] + kind},
                     param = {"tool": conf.peakcalltool},
                     name = "bed hotspot redundancy"))
+            target = conf.hotspot_starch_input[i]
 
         ## generate configuration for hotspot v4
         hotspot_conf = attach_back(workflow,
@@ -217,9 +218,9 @@ def _hotspot_on_replicates(workflow, conf, tex):
             input = {"pipe": pipeline_scripts, "token": target + "_runall_5M.tokens.txt"},
             output = {"dir": conf.target_dir,
                       "spot_peaks_combined": conf.hotspot_reps_final_5M_prefix[i] + ".fdr0.01.pks.bed",
-                      "density_starch": target + "_5M.tagdensity.bed.starch",
+                      "density_starch": target + "_5M_sort.tagdensity.bed.starch",
                       "hotspot":  conf.hotspot_reps_final_5M_prefix[i] + ".hot.bed",
-                      "spot": target + "_5M.spot.out"},
+                      "spot": target + "_5M_sort.spot.out"},
             param = {"spot": "5M",
                      "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}))
         ## 5M reads density from hotspot v4 tag density, 20bp resolution
@@ -227,7 +228,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
         attach_back(workflow, ShellCommand(
             "{tool} {input[starch]} > {output[bed]}",
             tool = "unstarch",
-            input = {"starch": target + "_5M.tagdensity.bed.starch"},
+            input = {"starch": target + "_5M_sort.tagdensity.bed.starch"},
             output = {"bed": target + "_5M.tagdensity.bed.tmp"}))
         ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
         ## filter bdg file to remove over-border coordinates
@@ -306,8 +307,7 @@ def _hotspot_combo(workflow, conf):
         output = {"dir": conf.target_dir,
                   "hotspot": conf.hotspot_merge_final_prefix + "_merge_all.hot.bed",
                   "peaks": conf.hotspot_merge_final_prefix + "_merge_all.fdr0.01.pks.bed",
-                  "density_starch": conf.prefix + "_merge_all.tagdensity.bed.starch",
-                  "spot": conf.prefix + "_merge_all.spot.out"},
+                  "density_starch": conf.prefix + "_merge_all.tagdensity.bed.starch"},
         param = {"spot": "all",
                  "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}))
     attach_back(workflow, ShellCommand(
@@ -586,7 +586,7 @@ def _peaks_calling_latex(workflow, conf, tex):
         name = "peaks number json"))
 
     if conf.peakcalltool == "hotspot":
-        spot = [ target + "_5M.spot.out" for target in conf.treatment_targets ]
+        spot = [ target + "_5M_sort.spot.out" for target in conf.treatment_targets ]
     elif conf.peakcalltool == "macs2":
         spot = [ target + "_5M_macs2_peaks.bed" + ".spot.out" for target in conf.treatment_targets ]
 

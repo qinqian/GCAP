@@ -175,7 +175,8 @@ def create_workflow(args, conf, tex):
         bld.build(library_complexity)
 
     if need_run(5):
-        bld.build(strand_cor)
+        if not conf.seq_type.startswith("bed"):
+            bld.build(strand_cor)
 
     if need_run(6):
         bld.build(fragment_size)

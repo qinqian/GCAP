@@ -40,14 +40,14 @@ def sample_reads(workflow, conf, N, format):
                     sampling,
                     input = {"sam": target + "_all.sam"},
                     output = {"sam_sample": target + "_%s.sam" % suffix},
-                    param = {"random_number": N}))
+                    param = {"random_number": N,
+                             "se_or_pe": conf.seq_type.strip().split(",")[1].strip().lower()}))
             else:
                 attach_back(workflow, PythonCommand(
                     sampling,
                     input = {"sam": target + "_all.sam"},
                     output = {"sam_sample": target + "_%s.sam" % suffix},
                     param = {"random_number": N,
-                             "map_or_unmap": "both",
                              "se_or_pe": conf.seq_type}))
     elif format == "bed":
         for target in conf.treatment_targets:
@@ -116,7 +116,7 @@ def pair_end_fastq_sampling(input = {"fastq": ""}, output = {"fastq_sample": ""}
         fhb.close()
     write_random_records(input["fastq"][0], input["fastq"][1], output["fastq_sample"][0], output["fastq_sample"][1], param["random_number"])
 
-def sampling(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "map_or_unmap": "both", "se_or_pe": ""}):
+def sampling(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_number": "", "se_or_pe": ""}):
     """
     get 5M reads from SAM, BED
     """
@@ -131,30 +131,29 @@ def sampling(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_
             else:
                 break
     print(header_num)
-    if param["map_or_unmap"] == "both":
-        if param["se_or_pe"] == "se":
-            rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
-            print(len(rand_nums))
-            cur_num = -1
-            written = 0
-            with open(output["sam_sample"], "w") as fout:
-                with open(input["sam"], "rU") as fin:
-                    for rand_num in rand_nums:
-                        while cur_num < rand_num:
-                            cur_num+=1
-                            data = fin.readline()
-                            if data.startswith("@"):
-                                fout.write(data)
+    if param["se_or_pe"] == "se":
+        rand_nums = sorted([random.randint(header_num, num_lines - 1) for _ in range(param["random_number"])])
+        print(len(rand_nums))
+        cur_num = -1
+        written = 0
+        with open(output["sam_sample"], "w") as fout:
+            with open(input["sam"], "rU") as fin:
+                for rand_num in rand_nums:
+                    while cur_num < rand_num:
+                        cur_num+=1
+                        data = fin.readline()
+                        if data.startswith("@"):
+                            fout.write(data)
 
-                        fout.write(fin.readline())
-                        cur_num += 1
-                        written += 1
-            assert  written == param["random_number"]
-        elif param["se_or_pe"] == "pe":
-            random_pe = []
-            cur_num = -1
-            written = 0
-            ## large memory version 1, faster, with paired reads sampling
+                    fout.write(fin.readline())
+                    cur_num += 1
+                    written += 1
+        assert  written == param["random_number"]
+    elif param["se_or_pe"] == "pe":
+        random_pe = []
+        cur_num = -1
+        written = 0
+        ## large memory version 1, faster, with paired reads sampling
 #            for _ in range(int(param["random_number"]/2)):
 #                num = random.choice(range(header_num, num_lines, 2))
 #                random_pe.append(num)
@@ -165,24 +164,24 @@ def sampling(input = {"sam": ""}, output = {"sam_sample": ""}, param = {"random_
 #               f.write("".join(header))
 #               for i in rand_nums:
 #                   f.write(data[i])
-            ## small memory version 2, slower and simpler
-            ## TODO: suggested by XiuXiu, open file twice, sampling odds and even separately
-            ## this would lead to paired reads
-            data_range = range(header_num, num_lines, 2)
-            for _ in range(int(param["random_number"]/2)):
-                num = random.choice(data_range)
-                random_pe.append(num)
-                random_pe.append(num+1)
+        ## small memory version 2, slower and simpler
+        ## TODO: suggested by XiuXiu, open file twice, sampling odds and even separately
+        ## this would lead to paired reads
+        data_range = range(header_num, num_lines, 2)
+        for _ in range(int(param["random_number"]/2)):
+            num = random.choice(data_range)
+            random_pe.append(num)
+            random_pe.append(num+1)
 
-            rand_nums = sorted(random_pe)
-            with open(output["sam_sample"], "w") as fout:
-                fout.write("".join(header))
-                with open(input["sam"], "rU") as fin:
-                    for rand_num in rand_nums:
-                        while cur_num < rand_num:
-                            cur_num+=1
-                            fin.readline()
-                        fout.write(fin.readline())
-                        cur_num += 1
-                        written += 1
-                assert  written == param["random_number"]
+        rand_nums = sorted(random_pe)
+        with open(output["sam_sample"], "w") as fout:
+            fout.write("".join(header))
+            with open(input["sam"], "rU") as fin:
+                for rand_num in rand_nums:
+                    while cur_num < rand_num:
+                        cur_num+=1
+                        fin.readline()
+                    fout.write(fin.readline())
+                    cur_num += 1
+                    written += 1
+            assert  written == param["random_number"]

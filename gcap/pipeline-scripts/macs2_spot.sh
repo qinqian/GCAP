@@ -35,16 +35,21 @@ fi
 
 proj=`echo $tags | sed s/\.bam$// | sed s/\.bed$//`
 
-if [ $bam == "T" ]; then
-    bamToBed -i $tags \
-        | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
-        | sort-bed - > ${proj}_tags.bed
-else
-    cat $tags \
-        | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
-        | sort-bed - > ${proj}_tags.bed
+echo ${proj}_tags.bed
+if [ ! -e ${proj}_tags.bed ]
+then
+    if [ $bam == "T" ]; then
+        bamToBed -i $tags \
+            | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
+            | sort-bed - > ${proj}_tags.bed
+    else
+        cat $tags \
+            | awk 'BEGIN{OFS="\t"}{if($6 == "-") $2=$3-1; print $1, $2, $2+1}' \
+            | sort-bed - > ${proj}_tags.bed
+    fi
+fi
 
-ntag=`unstarch ${proj}_tags.bed | wc -l | cut -d" " -f2`
+ntag=`cat ${proj}_tags.bed | wc -l | cut -d" " -f2`
 
 out=${peaks}.spot.out
 
