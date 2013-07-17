@@ -25,30 +25,74 @@ Then, install GCAP:
     git clone https://github.com/qinqian/GCAP
     python3 setup.py install
 
+***
+
 The following component tools are all newest version.
-	
+In the component installation process, you could open gcap/static/GCAP_pe.conf	and modify it to fit your own machine.
+
 ##### Install FastQC
 *Site* 	<http://www.bioinformatics.babraham.ac.uk/projects/fastqc/>, to keep `fastqc` in $PATH.
 Info: 
 	
 	Per sequence quality score median is parsed from fastq text output by GCAP.
+	This would be replaced by UCSC sampling tools.
+	There is an option for fastqc in conf
+	[fastqc]
+	threads = 5 # to control cpu number
+	
+***
 
 ##### Install Bowtie and BWA
 
 *Site* <http://bowtie-bio.sourceforge.net/index.shtml>
 
-Add binary to PATH and download `hg19, mm9, rn4` index for bowtie and bwa mapping and library contamination evaluation.
+1. Add bowtie and BWA binary to $PATH 
+2. download `hg19, mm9, rn4` bowtie index for library contamination evaluation, or use <http://compbio.tongji.edu.cn/~qinq/make_lib_contam_index.tar.gz> to build index. library contamination evaluation only uses bowtie.
+3. For default BWA mapping, use `bwa index -a bwtsw species.fa` to build hg19, mm9 index, species.fa denote species genome sequence in fasta format.
+4. use corresponding mapping tool and mapping index. e.g: 
 
-Install bwa reads mapping tool, bwa is used for reads mapping evaluation only, which needs corresponding species index, default: 4 threads.
+fill in conf:    
+
+    [tool]
+    mapping = bwa
+    [lib]
+    genome_index = absolute_path_to_bwa_index
+    or 
+    [tool]
+    mapping = bowtie
+    [lib]
+    genome_index = absolute_path_to_bowtie_index
+    
+    [contaminate]
+	## use bowtie index to fast evaluate library purity
+	hg19 = absolute_path_to_bowtie_index
+	mm9 = absolute_path_to_bowtie_index
+	rn4 = absolute_path_to_bowtie_index
+	
+***
 
 ##### Install Hotspot v4
 
 * Hotspot default setting is used
-* Download hotspot v3 from <http://www.uwencode.org/proj/hotspot/>, get the hotspot5, wavelets, wavePeaks into `$PATH`, you may need to compile from hotspot-deploy directory
-* Download `CHROM FILE` and `_MAPPABLE_FILE_` for your species and reads length
-* fill in the `_OMIT_Region` in conf files
+* Download Hotspot V4 from <http://www.uwencode.org/proj/hotspot/>, get the `bowtie2minmargin.pl  chopFastaPseudoreads.pl  enumerateUniquelyMappableSpace  enumerateUniquelyMappableSpace.pl  hotspot  wavelets  wavePeaks  writeChromInfoBed.pl` into `$PATH`, you may need to compile from hotspot-deploy directory
+* Download `chromInfo file` and `_MAPPABLE_FILE_` for your species and reads length(for speciel reads length, build mappable_region by enumerateUniquelyMappbleSpace) from hotspot website, fill in the `chrom_info` and `mappable_region` in hotspot section in `conf` files I mentioned below: 
+* fill in the `omit` in hotspot section with Hotspot V4 built-in data Satellites BED in conf files for hg19, not available for mm9.
 
 No matter it's SE or PE data, we take 5' tags for hotspot peaks calling.
+
+Fill in conf:
+	  
+	  [tool]
+	  peaks_calling = hotspot
+
+	  [hotspot]
+	  ## fill absolute path for these files
+	  mappable_region = absolute path
+	  chrom_info = absolute path
+	  fdrs = "0.01" 
+	  keep_dup = T  ## keep duplicates reads or not
+	  omit = absoluate path
+  
 
 <!--NOTE on hotspot v3 output: 
 	
@@ -112,7 +156,7 @@ No matter it's SE or PE data, we take 5' tags for hotspot peaks calling.
 	chr1    3595820 3595970 .       47.406250
 	chr1    3601420 3601570 .       9.750000-->
 	
-In hotspot v4, after `clean` up	, the final results are :
+In hotspot v4, after `run_final` clean up	, the final results are :
 
 	*.hot.bed           minimally thresholded hotspots( corresponding to hotspot v3 b, broad Peak)
 	*.fdr0.01.hot.bed       FDR thresholded hotspots  ( corresponding to hotspot v3 c) 
@@ -120,15 +164,36 @@ In hotspot v4, after `clean` up	, the final results are :
 	tag.density.starch  20 bp resolution, converted to bigwiggle
 	macs2 bigwiggle 100 bp resolution default
 	
+***
+	
 ##### install phantompeakqualtools
 *site* <https://code.google.com/p/phantompeakqualtools/>
 
+* install spp, snow for nsc and rsc
+
+fill in conf files:
+
+	[tool]
+	
+	spp = absolute_path_to_phantompeakqualtools/run_spp.R
+	
+*** 
+
 ##### install census
-*site* <https://github.com/matted/census>
-Use python2.7, install scipy, pysam, numpy, setuptools.
-Default, we use 0.005 excluded regions:
+*site* <https://github.com/matted/census>, see census readme for requred libraries installation, pytho2.7, scipy, pysam, numpy, setuptools. 
+
+Default, we use 0.005 for library complexity evaluation excluded regions:
 
 	 ./bam_to_histo.py seq.cov005.ONHG19.bed sorted.bam | ./calculate_libsize.py -
+	 
+census related census:
+
+	[census]
+	hist = absolute_path_to_directory_of_census/bam_to_histo.py
+	calc = directory_of_census/calculate_libsize.py
+	census_exclude = directory_of_census/seq.cov005.ONHG19.bed
+	
+*** 
 
 ##### install bedops and bedtools
 * use bedtools to get peaks overlap with union DHS region
@@ -141,12 +206,36 @@ Default, we use 0.005 excluded regions:
 
 
 ##### install picard and samtools
-- Use picard for SortSam, Markduplicates for both single end and pair end data, this will be replaced with `census`
-- Use picard for pair end data `median fragment size` and `fragment standard deviation` evaluation.
+*Site* <http://picard.sourceforge.net/index.shtml>
+- Use picard SortSam.jar for conversion
+- Use picard CollectInsertSizeMetrics.jar for pair end data `median fragment size` and `fragment standard deviation` evaluation.
 - For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 
   *predict_model.R.(this needs to be improved)
 
+macs2 install, macs2 depends on cython and gcc: 
+  
+  	git clone https://github.com/taoliu/MACS/
+	or 
+	pip install MACS2
+
+`Add MACS2 SPOT score calculation`
+
 `2G` memory, `4cpu` will be used in picard Markduplicates and Insert size evaluation, `5G` memory and `4cpu` will be used for picard SortSam. If you want to use picard to sample large files to 5M, use -XX:-UseGCOverheadLimit and 4g memory setting.
+
+fill in corresponding conf file:
+
+
+	[picard]
+	sort = absolute_path_to_picard/SortSam.jar
+	threads = 4  ## cpu number
+	insertsize = absolute_path_to_picard/CollectInsertSizeMetrics.jar
+	
+	[lib]
+	chrom_len = absolute_path_to_chrom_len
+	
+you can find `chrom_len` in <http://compbio.tongji.edu.cn/~qinq/lib/gcap_data/gcap_part_data.tar.gz>, which is used for samtools conversion.
+	
+
 
 ----
 
@@ -156,14 +245,36 @@ Default, we use 0.005 excluded regions:
 `bedGraphToBigWig` is used to convert hotspot reads density files to bigwiggle.
 `wigCorrelate` is used to remove outlier chromosome locations.
 
-
 Replicates consistency
 a. With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union DHS regions(filted by blacklist).
 b. For whole genome correlation, use `wigCorrelate`
 
+I made a compressed package for all needed binary.
+<http://compbio.tongji.edu.cn/~qinq/lib/ucsc_tools/ucsc_tools.tar.gz>
 
-#### Built-in modules
-Export gcap/pipeline-scripts/conservation_average.py to $PATH, needs `bx-python <https://bitbucket.org/james_taylor/bx-python/wiki/Home>` install.
+fill in conf files:
+	
+	[tool]
+	cor = genome  ## use wigCorrelate 
+	or 
+	cor = union  ## use bigWigCorrelate, need to fill filtered_dhs_bb
+	
+	[lib]
+	filtered_dhs_bb = 
+	
+filtered_dhs_bb is in <http://compbio.tongji.edu.cn/~qinq/lib/gcap_data/gcap_part_data.tar.gz>	
+
+-----
+
+#### Install latex and jinja2
+Check whether `pdflatex`(pdflatex (Version 3.141592-1.21a-2.2 (Web2C 7.5.4))) is executable or not. For d
+python3 module `jinja2` is a template module for rendering latex document:
+	
+	pip-3.2 install jinja2
+	# for options
+	pip-3.2 install argparse
+
+- - - -
 
 ##### union DHS filtered by blacklist
 Merged DHS from ENCODE narrow peaks(only involved in wgEncodeUwDnase* narrowPeaks from University of Washington because of their high quality) is used as reference union DHS regions. We get union DHS from +/- 150bp from narrowPeak summits, *site* <http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/>. Please email authors to get the BED files.
@@ -178,28 +289,21 @@ then, convert to bigBed:
 
 	bedToBigBed	union_dhs_filtered.bed chrom_len output.bigbed
 
-
-##### fragment size tools
-
-Install MACS2 for optional peaks caller and SE fragment size and standard deviation estimating and sampling reads BED file: 
-
-	git clone https://github.com/taoliu/MACS/
-	or 
-	pip install MACS2
-
-`Add MACS2 SPOT score calculation`
-
-- - - -
-
-#### Install latex and jinja2
-Check whether `pdflatex`(pdflatex (Version 3.141592-1.21a-2.2 (Web2C 7.5.4))) is executable or not. For d
-`jinja2` is a template module for rendering latex document:
+fill in corresponding conf file:
 	
-	pip-3.2 install jinja2
-	# for options
-	pip-3.2 install argparse
+	[lib]
+	chrom_bed = 
+	velcro =   ## blacklist
+	dhs = 
+	filtered_dhs_bb =  ## filling in this if you use `cor = union in tool section`
+	
+	
+you can find `chrom_bed` in <http://compbio.tongji.edu.cn/~qinq/lib/gcap_data/gcap_part_data.tar.gz>, which is used for peaks region filtering, `velcro` for blacklist, `dhs` for DHS overlap percentage, `filtered_dhs_bb` for union DHS region correlation.
+
 
 - - - -
+
+
 
 
 ### Usage
