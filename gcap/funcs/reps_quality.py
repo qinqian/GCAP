@@ -170,9 +170,9 @@ def peaks_reps_evaluating(workflow, conf, tex):
     cor = [ (conf.treatment_targets[i] + "_reps_" + str(i+1) + str(j+1) + "cor_score", "Rep %s %s" %(i + 1, j + 1))
             for i in range(len(conf.treatment_targets)) for j in range(i+1, len(conf.treatment_targets)) ]
 
-    ## get 5M union hotspot regions for I/U evaluation
+    ## get 5M union hotspot regions for regions number I/U jaccard index evaluation
     union = attach_back(workflow, ShellCommand(
-        "{tool} -u {param[reps]} > {output[union]}",
+        "{tool} -m {param[reps]} > {output[union]}",
         tool = "bedops",
         input = {"beds": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" for target in conf.treatment_targets ]},
         output = {"union": conf.prefix + "_hotspot_5M_union.bed"}))

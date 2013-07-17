@@ -25,7 +25,7 @@ def fragment_size(workflow, conf, tex):
                 input = {"bam": target + "_5M_sort.bam"},
                 output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
                 param = {"threads": 4},
-                name = "Sort sam"
+                name = "Fragment size picard"
             ))
             insert_size.update(param = conf.items("picard"))
 
