@@ -12,6 +12,8 @@ import random
 from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 
+
+## TODO: add fastq ucsc sampling and samtools view -s sampling
 def sample_reads(workflow, conf, N, format):
     """
     get random N reads from Fastq, SAM, BAM

@@ -169,7 +169,8 @@ In hotspot v4, after `run_final` clean up	, the final results are :
 ##### install phantompeakqualtools
 *site* <https://code.google.com/p/phantompeakqualtools/>
 
-* install spp, snow for nsc and rsc
+* install spp(this should be phantompeakqualtools built-in spp-*.tar.gz, use R CMD INSTALL), snow for nsc and rsc
+* refer to phantompeakqualtools if necessary
 
 fill in conf files:
 

@@ -13,12 +13,12 @@ from gcap.funcs.helpers import *
 
 def strand_cor(workflow, conf, tex):
     """ use ccQualityControl run_spp.R to estimate
-    Rscript run_spp.R -c=<tagAlign/BAMfile> -savp -out=<outFile>
+    Rscript run_spp.R -rf -c=<tagAlign/BAMfile> -savp -out=<outFile>
     support BAM/SAM, fastq input
     """
     for target in conf.treatment_targets:
         attach_back(workflow, ShellCommand(
-            "{tool} {param[spp]} -c={input[bam]} -savp -out={output}",
+            "{tool} {param[spp]} -c={input[bam]} -out={output}",      ## no not need -savp, plot
             tool = "Rscript",
             input = {"bam": target + "_5M_sort.bam"},
             output = target + "_strand_cor",
