@@ -17,10 +17,12 @@ def library_complexity(workflow, conf, tex):
     """
     ## choose sampling modes
     if not conf.seq_type.startswith("bed"):
-        ## top 5M raw reads
-        sample_reads(workflow, conf, 5000000, "sam")
-        # picard markduplicates need SortSam
-        ## for fastq files
+        ## top 5M raw reads, output SAM
+        if conf.seq_type.startswith("bam"):
+            sample_reads(workflow, conf, 5000000, "bam")
+        else:
+            sample_reads(workflow, conf, 5000000, "sam")
+        ## for fastq files or sam input
         for target in conf.treatment_targets:
             lib_sort = attach_back(workflow, ShellCommand(
                 "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[sort]} I={input[bam]} O={output[bam]} SO=coordinate \

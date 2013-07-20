@@ -14,14 +14,15 @@ def _versatile_format(workflow, conf):
     support SAM/BAM and BED reads files
     """
     for n, target in enumerate(conf.treatment_targets):
+        ## link to uniform interface
         if conf.seq_type.startswith("bam"):
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} view -h {input[bam]} > {output[sam]}",
-                    tool = "samtools",
+                    "{tool} -sf {input[bam]} > {output[bam]}",
+                    tool = "ln",
                     input = {"bam": conf.treatment_bam[n]},
-                    output = {"sam": target + "_all.sam"},
-                    name = "samtools conversion"))
+                    output = {"bam": target + "_all.bam"},
+                    name = "link"))
         elif conf.seq_type.startswith("sam"):
             attach_back(workflow,
                 ShellCommand(
@@ -37,82 +38,54 @@ def _versatile_format(workflow, conf):
                     input = {"bed":conf.treatment_bed[n]}, ## actually bed files
                     output = {"bed":target + "_all.bed"}))
 
-## parse fastqc result
-def fastqc_parse(input):
-    data = open(input).readlines()
-    sequence_length = 0
-    quality_dict = {}
-    in_seq_quality_section = False
-    for line in data:
-        if re.search(r"^Sequence length", line):
-            assert sequence_length == 0
-            sequence_length = int(re.findall(r"^Sequence length\t(\d+)", line)[0])
-        elif re.search(r"^>>Per sequence quality", line):
-            assert not in_seq_quality_section
-            in_seq_quality_section = True
-            continue
-
-        if re.search(r"^>>END_MODULE", line) and in_seq_quality_section:
-            in_seq_quality_section = False
-
-        if (not line.startswith("#")) and in_seq_quality_section:
-            sequence_quality = re.findall("^(\w+)\t(\w+)", line)[0]
-            quality_dict[sequence_quality[0]] = float(sequence_quality[1])
-    total = sum(quality_dict.values())
-    n = 0
-    for item in sorted(quality_dict.items(), key=lambda e: e[0], reverse=True):
-        n = n + item[1]
-        if n / total > 0.5:
-            median = int(item[0])
-            break
-    return {"sequence_length": sequence_length,
-            "median": median}
-
-def stat_fastqc(input = {"fastqc_summaries": []},
-                output={"json": ""},
-                param= {"samples": ""}):
-    """
-    parse per sequence quality median from fastqc text file
-    """
-    json_dict = {"stat": {}, "input": input, "output": output, "param": param}
-    stat = {}
-    for a_summary, a_id in zip(input["fastqc_summaries"], param["samples"]):
-        print(a_summary, a_id)
-        parsed = fastqc_parse(input=a_summary)
-        stat[a_id] = {}
-        stat[a_id]["median"] = parsed["median"]
-        stat[a_id]["cutoff"] = 25
-        stat[a_id]["sequence_length"] = parsed["sequence_length"]
-
-    json_dict["stat"] = stat
+## parse fastqStatsAndSubsample result
+def stat_fastqStat(input = {"seq": ""}, output = {"json": ""}, param = {"samples": "", "seq_type": ""}):
+    json_dict = {"input": input, "output": output, "param": param, "stat": {}}
+    if param["seq_type"] == "pe":
+        for i, s in zip(input['seq'], param['samples']):
+            with open(i[0]) as f:
+                data = f.readlines()
+                json_dict["stat"][s + "_pair1"] = {}
+                json_dict["stat"][s + "_pair1"]['count'] = data[0].strip().split()[1]
+                json_dict["stat"][s + "_pair1"]['quality'] = round(float(data[6].strip().split()[1]), 1)
+                json_dict["stat"][s + "_pair1"]['std'] = data[7].strip().split()[1]
+                json_dict["stat"][s + "_pair1"]['len'] = data[2].strip().split()[1]
+            with open(i[1]) as f:
+                data = f.readlines()
+                json_dict["stat"][s + "_pair2"] = {}
+                json_dict["stat"][s + "_pair2"]['count'] = data[0].strip().split()[1]
+                json_dict["stat"][s + "_pair2"]['quality'] = round(float(data[6].strip().split()[1]), 1)
+                json_dict["stat"][s + "_pair2"]['std'] = data[7].strip().split()[1]
+                json_dict["stat"][s + "_pair2"]['len'] = data[2].strip().split()[1]
+    if param["seq_type"] == "se":
+        for i, s in zip(input['seq'], param['samples']):
+            with open(i) as f:
+                data = f.readlines()
+                json_dict["stat"][s] = {}
+                json_dict["stat"][s]['count'] = data[0].strip().split()[1]
+                json_dict["stat"][s]['quality'] = data[6].strip().split()[1]
+                json_dict["stat"][s]['std'] = data[7].strip().split()[1]
+                json_dict["stat"][s]['len'] = data[2].strip().split()[1]
     json_dump(json_dict)
 
 ## parse json files to latex reads length and sequence quality part
-def seq_quality_doc(input = {"tex": "", "json": ""}, output = {}, param = {"reps": "", "se_samples": "", "pe_samples": ""}):
-    if type(input["json"]) == str:
-        json = json_load(input['json'])
-        seq = [ json["stat"][s]["median"] for s in param["se_samples"] ]
-        len = [ str(json['stat'][s]['sequence_length']) + " " + param["seq_type"].upper() for s in param["se_samples"] ]
-    elif type(input["json"]) == list:
-        seq = []
-        len = []
-
-        for j, s in zip(input["json"], param["pe_samples"]):
-            pair_seq = []
-            pair_len = []
-            data = json_load(j)
-
-            for d in s:
-                pair_seq.append(str(data['stat'][d]['median']))
-                pair_len.append(str(data['stat'][d]['sequence_length']) + " " + param["seq_type"].upper())
-
-            seq.append(','.join(pair_seq))
-            len.append(','.join(pair_len))
+def seq_quality_doc(input = {"tex": "", "json": ""}, output = {}, param = {"reps": "", "se_samples": "", "pe_samples": "", "seq_type": ""}):
+    data = json_load(input["json"])['stat']
+    seq = []
+    len = []
+    if param["seq_type"] == "pe":
+        for s in param["pe_samples"]:
+            seq.append(str(data[s + "_pair1"]['quality']) + ',' + str(data[s + "_pair2"]['quality']))
+            len.append(data[s + "_pair1"]['len'] + ',' + data[s + "_pair2"]['len'])
+    else:
+        for s in param["se_samples"]:
+            seq.append(data[s]['quality'])
+            len.append(data[s]['len'])
 
     seq_latex = JinjaTemplateCommand(
         template = input["tex"],
         name = "sequence quality",
-        param = {"section_name": "sequence_quality.py",
+        param = {"section_name": "sequence_quality",
                  "render_dump": output["seq"],
                  "seq_quality": seq,
                  "reps": param["reps"]})
@@ -127,7 +100,6 @@ def seq_quality_doc(input = {"tex": "", "json": ""}, output = {}, param = {"reps
     template_dump(seq_latex)
     template_dump(len_latex)
 
-## fastqc command line
 ## fastqStatsAndSubsample command line
 def seq_quality(workflow, conf, tex):
     """
@@ -136,54 +108,36 @@ def seq_quality(workflow, conf, tex):
     """
     if conf.seq_type == "pe": ## PE
         sample_reads(workflow, conf, 100000, "fastq")
-        for n, target in enumerate(conf.treatment_pair_data):
-            for p in target:
-                fastqc_run = attach_back(workflow,
-                    ShellCommand(
-                        "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                        input= {"fastq_sample": p + "_100k.fastq"},
-                        output={"target_dir": conf.target_dir,
-                                "fastqc_summary": p + "_100k_fastqc/fastqc_data.txt"},
-                        tool="fastqc",
-                        param={"threads": 4}))
-                fastqc_run.update(param=conf.items("fastqc"))
-            attach_back(workflow, PythonCommand(stat_fastqc,
-                input = {"fastqc_summaries": [ p + "_100k_fastqc/fastqc_data.txt" for p in target ]},
-                output = {"json": conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json"},
-                param = {"samples": target }))
+        attach_back(workflow, PythonCommand(stat_fastqStat,
+            input = {"seq": [ [ p + "_100k.seq" for p in target ] for target in conf.treatment_pair_data ]},
+            output = {"json": conf.json_prefix + "_seq_quality.json"},
+            param = {"samples": conf.treatment_bases, "seq_type": conf.seq_type}))
         attach_back(workflow, PythonCommand(
             seq_quality_doc,
-            input = {"tex": tex, "json": [ conf.json_prefix + "_rep" + str(n+1) + "_fastqc.json" for n in range(len(conf.treatment_pair_data)) ]},
+            input = {"tex": tex, "json": conf.json_prefix + "_seq_quality.json"},
             output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
             param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs),
-                     "pe_samples": [ target for target in conf.treatment_pair_data ]}))
+                     "pe_samples": conf.treatment_bases}))
 
     elif conf.seq_type == "se":
         sample_reads(workflow, conf, 100000, "fastq")
-        for target in conf.treatment_targets:
-            fastqc_run = attach_back(workflow,
-                ShellCommand(
-                    "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                    input= {"fastq_sample": target +  "_100k.fastq"},
-                    output={"target_dir": conf.target_dir,
-                            "fastqc_summary": target + "_100k_fastqc/fastqc_data.txt"},
-                    tool="fastqc",
-                    param={"threads": 4},
-                    name = "fastqc"))
-            fastqc_run.update(param=conf.items("fastqc"))
-        attach_back(workflow, PythonCommand(stat_fastqc,
-            input = {"fastqc_summaries": [ t + "_100k_fastqc/fastqc_data.txt" for t in conf.treatment_targets ]},
-            output = {"json": conf.json_prefix + "_fastqc.json"},
-            param = {"samples": conf.treatment_bases}))
+        attach_back(workflow, PythonCommand(stat_fastqStat,
+            input = {"seq": [ t + "_100k.seq" for t in conf.treatment_targets ]},
+            output = {"json": conf.json_prefix + "_seq_quality.json"},
+            param = {"samples": conf.treatment_bases,
+                     "seq_type": conf.seq_type}))
         attach_back(workflow, PythonCommand(
             seq_quality_doc,
-            input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
+            input = {"tex": tex, "json": conf.json_prefix + "_seq_quality.json"},
             output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
             param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases}))
 
     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
         _versatile_format(workflow, conf)
-        sample_reads(workflow, conf, 100000, "sam")
+        if conf.seq_type.startswith("bam"):
+            sample_reads(workflow, conf, 100000, "bam")
+        else:
+            sample_reads(workflow, conf, 100000, "sam")
         for target in conf.treatment_targets:
             attach_back(workflow,
                 ShellCommand(
@@ -210,7 +164,7 @@ def seq_quality(workflow, conf, tex):
                     name = "fastqc"))
             fastqc_run.update(param=conf.items("fastqc"))
         ## get per sequence quality median
-        attach_back(workflow, PythonCommand(stat_fastqc,
+        attach_back(workflow, PythonCommand(stat_fastqStat,
             input = {"fastqc_summaries": [ t + "%s_fastqc/fastqc_data.txt" % suffix for t in conf.treatment_targets ]},
             output = {"json": conf.json_prefix + "_fastqc.json"},
             param = {"samples": conf.treatment_bases}))

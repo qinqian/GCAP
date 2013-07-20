@@ -54,10 +54,10 @@ def report(workflow, conf, tex):
          && {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}\
          && {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}",
         tool="pdflatex",
-        input= collector,
+        input= collector[0],
         # output[pdf] should use "conf.prefix" to have the absolute path
         output={"tex": conf.prefix + "_report.tex", "dir": conf.target_dir, "pdf": conf.prefix + "_report.pdf"},
         # param[name] should use "conf.id" to avoid using absolute path
         param={"name": conf.id + "_report"},
         name="report"))
-    integrate_doc.param.update({"input": " ".join(integrate_doc.input)})
+    integrate_doc.param.update({"input": " ".join(collector)})
