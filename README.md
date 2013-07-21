@@ -30,17 +30,6 @@ Then, install GCAP:
 The following component tools are all newest version.
 In the component installation process, you could open gcap/static/GCAP_pe.conf	and modify it to fit your own machine.
 
-##### Install FastQC
-*Site* 	<http://www.bioinformatics.babraham.ac.uk/projects/fastqc/>, to keep `fastqc` in $PATH.
-Info: 
-	
-	Per sequence quality score median is parsed from fastq text output by GCAP.
-	This would be replaced by UCSC sampling tools.
-	There is an option for fastqc in conf
-	[fastqc]
-	threads = 5 # to control cpu number
-	
-***
 
 ##### Install Bowtie and BWA
 
@@ -478,10 +467,12 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 		
 		GCAP batch -b batch.conf --resume
 
-  
-#### Tips 
-`Update`: use fastqStatsAndSubsample  sampleBam implemented by Jim Kent.
+## Change Log
 
+`Update`: use fastqStatsAndSubsample(fastq sampling)  implemented by Jim Kent, `samtools view -s`(sam,bam sampling), remove
+dependency of FastQC.
+
+#### Tips
 <!--- We use built-in function to do raw reads sampling from PE and SE FASTQ(default) .
 - Python function to sample reads from PE and SE SAM(BAM converted SAM) files， including `mappable and unmappable reads`.(default for SAM and BAM)
 - picard sampling for PE and SE SAM and BAM files mappable reads. (May use many threads and memory)(optional in picard options, uncomment for default)

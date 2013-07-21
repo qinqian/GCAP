@@ -18,10 +18,12 @@ def _versatile_format(workflow, conf):
         if conf.seq_type.startswith("bam"):
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} -sf {input[bam]} > {output[bam]}",
+                    "{tool} -sf {input[bam]} > {output[bam]} && \
+                    samtools view -h {input[bam]} > {output[sam]}",
                     tool = "ln",
                     input = {"bam": conf.treatment_bam[n]},
-                    output = {"bam": target + "_all.bam"},
+                    output = {"bam": target + "_all.bam",
+                              "sam": target + "_all.sam"}, ## for pipeline-scripts/autosome* for mapping statistics
                     name = "link"))
         elif conf.seq_type.startswith("sam"):
             attach_back(workflow,
@@ -57,7 +59,7 @@ def stat_fastqStat(input = {"seq": ""}, output = {"json": ""}, param = {"samples
                 json_dict["stat"][s + "_pair2"]['quality'] = round(float(data[6].strip().split()[1]), 1)
                 json_dict["stat"][s + "_pair2"]['std'] = data[7].strip().split()[1]
                 json_dict["stat"][s + "_pair2"]['len'] = data[2].strip().split()[1]
-    if param["seq_type"] == "se":
+    if param["seq_type"] in ["se", "bam", "sam"]:
         for i, s in zip(input['seq'], param['samples']):
             with open(i) as f:
                 data = f.readlines()
@@ -135,9 +137,9 @@ def seq_quality(workflow, conf, tex):
     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
         _versatile_format(workflow, conf)
         if conf.seq_type.startswith("bam"):
-            sample_reads(workflow, conf, 100000, "bam")
+            sample_reads(workflow, conf, 110000, "bam")
         else:
-            sample_reads(workflow, conf, 100000, "sam")
+            sample_reads(workflow, conf, 110000, "sam")
         for target in conf.treatment_targets:
             attach_back(workflow,
                 ShellCommand(
@@ -153,27 +155,23 @@ def seq_quality(workflow, conf, tex):
         suffix = "_100k" ## output suffix
         ## for single end 100k fastq or PE, SE 100k sam
         for target in conf.treatment_targets:
-            fastqc_run = attach_back(workflow,
+            attach_back(workflow,
                 ShellCommand(
-                    "{tool} {input[fastq_sample]} --extract -t {param[threads]} -o {output[target_dir]}",
-                    input= {"fastq_sample": target +  file_suffix},
-                    output={"target_dir": conf.target_dir,
-                            "fastqc_summary": target + "%s_fastqc/fastqc_data.txt" % suffix},
-                    tool="fastqc",
-                    param={"threads": 4},
-                    name = "fastqc"))
-            fastqc_run.update(param=conf.items("fastqc"))
-        ## get per sequence quality median
+                    "{tool} -i {input[bam]} -fq {output[fastq]}",
+                    tool = "bamToFastq",
+                    input = {"bam": target + "_100k.bam"},
+                    output = {"fastq": target + "_100k.fastq.tmp"}))
+        sample_reads(workflow, conf, 100000, "fastq")
         attach_back(workflow, PythonCommand(stat_fastqStat,
-            input = {"fastqc_summaries": [ t + "%s_fastqc/fastqc_data.txt" % suffix for t in conf.treatment_targets ]},
-            output = {"json": conf.json_prefix + "_fastqc.json"},
-            param = {"samples": conf.treatment_bases}))
-        ## sequence quality latex load, reads length
+            input = {"seq": [ t + "_100k.seq" for t in conf.treatment_targets ]},
+            output = {"json": conf.json_prefix + "_seq_quality.json"},
+            param = {"samples": conf.treatment_bases,
+                     "seq_type": conf.seq_type.strip().split(",")[0].strip().lower()}))
         attach_back(workflow, PythonCommand(
             seq_quality_doc,
-            input = {"tex": tex, "json": conf.json_prefix + "_fastqc.json"},
+            input = {"tex": tex, "json": conf.json_prefix + "_seq_quality.json"},
             output = {"seq": conf.latex_prefix + "seq_quality.tex", "len": conf.latex_prefix + "len.tex"},
-            param = {"seq_type": conf.seq_type, "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases})) ## single bam samples
+            param = {"seq_type": conf.seq_type.strip().split(",")[0].strip().lower(), "reps": len(conf.treatment_pairs), "se_samples": conf.treatment_bases}))
 
     elif conf.seq_type.startswith("bed"): ## not evaluate sequence quality
         _versatile_format(workflow, conf)
