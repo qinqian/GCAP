@@ -80,6 +80,7 @@ def sample_reads(workflow, conf, N, format):
             attach_back(workflow, ShellCommand(
                 "a=$({tool} flagstat {input[bam]} | head -1 | cut -f 1 -d\" \") && b=$(echo \"scale=5;{param[random_number]}/$a\" | bc) \
                 && echo $b && {tool} view -bhs  $b {input[bam]} > {output[bam_sample]}",
+                tool = "samtools",
                 input = {"bam": target + "_all.bam"},
                 output = {"bam_sample": target + "_%s.bam.tmp" % suffix},
                 param = {"random_number": 1.05*N,

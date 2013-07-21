@@ -18,7 +18,7 @@ def _versatile_format(workflow, conf):
         if conf.seq_type.startswith("bam"):
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} -sf {input[bam]} > {output[bam]} && \
+                    "{tool} -sf {input[bam]} {output[bam]} && \
                     samtools view -h {input[bam]} > {output[sam]}",
                     tool = "ln",
                     input = {"bam": conf.treatment_bam[n]},
