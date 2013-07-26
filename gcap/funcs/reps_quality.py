@@ -124,7 +124,7 @@ def peaks_reps_evaluating(workflow, conf, tex):
                 another_rep =  conf.treatment_targets[j] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} -a {input[one_rep]} -b {input[another_rep]} > {output}",
+                    "{tool} -u -a {input[one_rep]} -b {input[another_rep]} > {output}",
                     tool="intersectBed",
                     input = {"one_rep": one_rep,
                              "another_rep": another_rep},
