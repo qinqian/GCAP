@@ -36,9 +36,18 @@ In the component installation process, you could open gcap/static/GCAP_pe.conf	a
 *Site* <http://bowtie-bio.sourceforge.net/index.shtml>
 
 1. Add bowtie and BWA binary to $PATH 
-2. download `hg19, mm9, rn4` bowtie index for library contamination evaluation, or use <http://compbio.tongji.edu.cn/~qinq/make_lib_contam_index.tar.gz> to build index. library contamination evaluation only uses bowtie.
+2. Download or build `hg19, mm9, rn4` bowtie index,
+   this is for bowtie mapping and  library contamination evaluation,
+   you can use <http://compbio.tongji.edu.cn/~qinq/make_lib_contam_index.tar.gz>` to download fasta and build index, use the same fasta for building bwa index.
 3. For default BWA mapping, use `bwa index -a bwtsw species.fa` to build hg19, mm9 index, species.fa denote species genome sequence in fasta format.
-4. use corresponding mapping tool and mapping index. e.g: 
+
+NOTE:
+
+    Thanks Morgan's discussion on this.
+    For building index, use genome fasta files with standard chromosome names,
+    such as '>chr1', it's required for census and peaks calling tools, for human, you could download fasta from <compbio.tongji.edu.cn/~qinq/hg19.fa>.
+
+4. Use corresponding mapping tool and mapping index. e.g:
 
 fill in conf:    
 
@@ -469,7 +478,7 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 
 ## Change Log
 
-`Update`: use fastqStatsAndSubsample(fastq sampling)  implemented by Jim Kent, `samtools view -s`(sam,bam sampling), remove
+`Update`: use fastqStatsAndSubsample(fastq sampling) implemented by Jim Kent, Jim's suggestions on using samtools sampling, `samtools view -s`(sam,bam sampling), remove
 dependency of FastQC.
 
 #### Tips
