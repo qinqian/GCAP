@@ -204,12 +204,13 @@ census related census:
 *** 
 
 
-##### install picard and samtools
+##### install latest picard and samtools
 *Site* <http://picard.sourceforge.net/index.shtml>
 - Use picard SortSam.jar for conversion
 - Use picard CollectInsertSizeMetrics.jar for pair end data `median fragment size` and `fragment standard deviation` evaluation.
 - For single end data, we used MACS2 predictd to predict fragment size and calculate standard deviation by using MACS2 
   *predict_model.R.(this needs to be improved)
+- only latest samtools has sampling functions
 
 macs2 install, macs2 depends on cython and gcc: 
   
@@ -248,7 +249,7 @@ Replicates consistency
 a. With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union DHS regions(filted by blacklist).
 b. For whole genome correlation, use `wigCorrelate`
 
-I made a compressed package for all needed binary.
+I made a compressed package for all needed binary, including fastqStatsAndSubsample,
 <http://compbio.tongji.edu.cn/~qinq/lib/ucsc_tools/ucsc_tools.tar.gz>
 
 fill in conf files:
@@ -478,7 +479,7 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 
 ## Change Log
 
-`Update`: use fastqStatsAndSubsample(fastq sampling) implemented by Jim Kent, Jim's suggestions on using samtools sampling, `samtools view -s`(sam,bam sampling), remove
+`Update`: use lastest fastqStatsAndSubsample(fastq sampling) implemented by Jim Kent, Jim's suggestions on using `latest samtools sampling`, `samtools view -s`(sam,bam sampling), remove
 dependency of FastQC.
 
 #### Tips
