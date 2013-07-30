@@ -113,7 +113,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
 	*-final/tag.density.starch      20bp resolution, converted to bigwiggle
     """
     if conf.seq_type.startswith("bed"):
-        kind = "_all.bed"
+        kind = "_all.bed.starch"
         suffix = "_5M.bed.starch"
     else:
         kind = ".bam"
@@ -121,23 +121,12 @@ def _hotspot_on_replicates(workflow, conf, tex):
 
     for i, target in enumerate(conf.treatment_targets):
         ## hotspot v4 support BAM and bed.starch(in a new directory for filtering tags) input
-        if conf.seq_type.startswith("bed"):
-            attach_back(workflow,
-                ShellCommand(
-                    "{tool} {input} {output[starch]} {param[tool]}",
-                    tool = "bed_duplicates.sh",
-                    input = target + kind,
-                    output = {"redundancy": target + ".dup_metrics",
-                              "starch": conf.hotspot_starch_input[i] + kind},
-                    param = {"tool": conf.peakcalltool},
-                    name = "bed hotspot redundancy"))
-            target = conf.hotspot_starch_input[i]
-
         ## generate configuration for hotspot v4
         hotspot_conf = attach_back(workflow,
             PythonCommand(spot_conf,
                 input = {"spot_conf": token_file,
-                         "tag": target + kind,
+                         ## for bed.starch input files, should be in a different output directory
+                         "tag": conf.hotspot_starch_input[i] + kind if conf.seq_type.startswith("bed") else target + kind,
                          "mappable_region": conf.get("hotspot", "mappable_region"),
                          "chrom_info": conf.get("hotspot", "chrom_info")},
                 output = {"conf": target + "_runall.tokens.txt",
@@ -188,12 +177,12 @@ def _hotspot_on_replicates(workflow, conf, tex):
     ## Use 5M reads to estimate SPOT
     for i, target in enumerate(conf.treatment_targets):
         ## prepare input for hotspot, get mappable tags and starch into output directory
-        if conf.seq_type.startswith("bed"):
+        if conf.seq_type.startswith("bed"):  ## get library complexity
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} {input} {output[starch]} {param[tool]}",
+                    "{tool} {input} {output[starch]} {param[tool]} {output[redundancy]}",
                     tool = "bed_duplicates.sh",
-                    input = target + suffix,
+                    input = target + "_5M.bed",
                     output = {"starch": conf.hotspot_starch_input[i] + suffix,
                               "redundancy": target + ".dup_metrics"},
                     param = {"tool": conf.peakcalltool}))
@@ -202,7 +191,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
         hotspot_conf = attach_back(workflow,
             PythonCommand(spot_conf,
                 input = {"spot_conf": token_file,
-                         "tag": target + suffix,
+                         "tag": conf.hotspot_starch_input[i] + suffix if conf.seq_type.startswith("bed") else target + suffix, ## for bed.starch input files, should be in a different output directory
                          "mappable_region": conf.get("hotspot", "mappable_region"),
                          "chrom_info": conf.get("hotspot", "chrom_info")},
                 output = {"conf": target + "_runall_5M.tokens.txt",
@@ -212,7 +201,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
                          "keep_dup": "T"}))
         hotspot_conf.param.update(conf.items("hotspot"))
         ## run hotspot v4
-        attach_back(workflow, ShellCommand(
+        hotspot_run = attach_back(workflow, ShellCommand(
             "{tool} {input[pipe]} {input[token]} {output[dir]} {param[spot]} {param[omit]}",
             tool = "runhotspot",
             input = {"pipe": pipeline_scripts, "token": target + "_runall_5M.tokens.txt"},
@@ -223,6 +212,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
                       "spot": target + "_5M_sort.spot.out"},
             param = {"spot": "5M",
                      "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}))
+
         ## 5M reads density from hotspot v4 tag density, 20bp resolution
         ## for correlation evaluation
         attach_back(workflow, ShellCommand(
@@ -351,7 +341,7 @@ def _macs2_on_reps(workflow, conf, tex):
         ## keep all duplicate tags as hotspot
         macs2_on_rep = attach_back(workflow,
             ShellCommand(
-                "{tool} callpeak -B -q 0.01 -f {param[format]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                "{tool} callpeak -B -q {param[fdr]} -f {param[format]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + kind},
@@ -360,7 +350,8 @@ def _macs2_on_reps(workflow, conf, tex):
                         "treat_bdg": target + "_macs2_all_treat_pileup.bdg",
                         "peaks_xls": target + "_macs2_all_peaks.xls",
                         "control_bdg": target + "_macs2_all_control_lambda.bdg"},
-                param={"description": target + "_macs2_all", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
+                param={"description": target + "_macs2_all", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species"),
+                       "fdr": 0.01},
                 name="macs2_callpeak_rep"))
         macs2_on_rep.param["treat_opt"] = "-t " + macs2_on_rep.input["treat"]
         macs2_on_rep.update(param=conf.items("macs2"))
@@ -404,7 +395,7 @@ def _macs2_on_reps(workflow, conf, tex):
         ## keep all duplicate tags as hotspot
         macs2_on_rep = attach_back(workflow,
             ShellCommand(
-                "{tool} callpeak -B -q 0.01 -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                "{tool} callpeak -B -q {param[fdr]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + suffix},
@@ -413,7 +404,8 @@ def _macs2_on_reps(workflow, conf, tex):
                         "treat_bdg": target + "_5M_macs2_treat_pileup.bdg",
                         "peaks_xls": target + "_5M_macs2_peaks.xls",
                         "control_bdg": target + "_5M_macs2_control_lambda.bdg"},
-                param={"description": target + "_5M_macs2", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species")},
+                param={"description": target + "_5M_macs2", "keep_dup": "all", "shiftsize": 50, "species": conf.get("macs2", "species"),
+                       "fdr": 0.01},
                 name="macs2_callpeak_rep"))
         macs2_on_rep.param["treat_opt"] = "-t " + macs2_on_rep.input["treat"]
         macs2_on_rep.update(param=conf.items("macs2"))
@@ -422,12 +414,12 @@ def _macs2_on_reps(workflow, conf, tex):
         if conf.seq_type.startswith("bed"):
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} {input} {output[starch]} {param[tool]}",
+                    "{tool} {input} {param[starch]} {param[tool]} {output[redundancy]}",
                     tool = "bed_duplicates.sh",
                     input = target + suffix,
-                    output = {"starch": "no", ## do not need to output starch files for macs2
-                              "redundancy": target + ".dup_metrics"},
-                    param = {"tool": conf.peakcalltool}))
+                    output = {"redundancy": target + ".dup_metrics"},
+                    param = {"tool": conf.peakcalltool,
+                             "starch": "no"})) ## no need to starch for macs2
 
         ## SPOT score for MACS2 5M reads
         attach_back(workflow, ShellCommand(
@@ -487,7 +479,7 @@ def _macs2_on_combo(workflow, conf):
         attach_back(workflow, merge_beds_treat)
         kind = "_treatment.bed"
     macs2_on_merged = attach_back(workflow, ShellCommand(
-        "{tool} callpeak -B -q 0.01 -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+        "{tool} callpeak -B -q {param[fdr]} -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
         {param[treat_opt]} -n {param[description]}",
         tool="macs2",
         input={"merged": conf.prefix + kind},
@@ -499,6 +491,7 @@ def _macs2_on_combo(workflow, conf):
         param={"description": conf.prefix,
                "keep_dup": "all",
                "shiftsize": 50,
+               "fdr": 0.01,
                "species": conf.get("macs2",  "species")},
         name="macs2_callpeak_merged"))
 

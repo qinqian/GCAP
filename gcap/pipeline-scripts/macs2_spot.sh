@@ -24,12 +24,12 @@ test=$(echo $tags | grep "\.bam$")
 if [ ${#test} != 0 ]; then
     bam=T
 else
-    test=$(echo $tags | grep "\.bed\.starch$")
+    test=$(echo $tags | grep "\.bed$")
     if [ ${#test} != 0 ]; then
-	bam=F
+	    bam=F
     else
-	echo "$thisscr: $tags must end in .bam or .bed.starch"
-	exit
+	    echo "$thisscr: $tags must end in .bam or .bed"
+	    exit
     fi
 fi
 
@@ -49,7 +49,7 @@ then
     fi
 fi
 
-ntag=`cat ${proj}_tags.bed | wc -l | cut -d" " -f2`
+ntag=`wc -l ${proj}_tags.bed | cut -d" " -f1`
 
 out=${peaks}.spot.out
 

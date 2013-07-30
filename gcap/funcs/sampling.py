@@ -110,7 +110,7 @@ def sample_reads(workflow, conf, N, format):
 #                    param = {"random_number": N,
 #                             "se_or_pe": conf.seq_type}))
     elif format == "bed":
-        for target in conf.treatment_targets:
+        for i, target in enumerate(conf.treatment_targets):
             ## macs2 randsample sampling mappable reads from BED reads files
             attach_back(workflow, ShellCommand(
                 "{tool} randsample -t {input[bed]} -n {param[rand_number]} -o {output[bed]}",

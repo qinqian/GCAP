@@ -40,6 +40,14 @@ def _versatile_format(workflow, conf):
                     input = {"bed":conf.treatment_bed[n]}, ## actually bed files
                     output = {"bed":target + "_all.bed"}))
 
+            if conf.peakcalltool == "hotspot": ## prepare bed.starch for hotspot peaks calling
+                attach_back(workflow,
+                    ShellCommand(
+                        "sort-bed {input[bed]} | starch - > {output[starch]}",
+                        tool = "ln",
+                        input = {"bed":conf.treatment_bed[n]}, ## actually bed files
+                        output = {"starch":conf.hotspot_starch_input[n] + "_all.bed.starch"}))
+
 ## parse fastqStatsAndSubsample result
 def stat_fastqStat(input = {"seq": ""}, output = {"json": ""}, param = {"samples": "", "seq_type": ""}):
     json_dict = {"input": input, "output": output, "param": param, "stat": {}}

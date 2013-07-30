@@ -178,11 +178,11 @@ class Conf(object):
 
     @property
     def maptool(self):
-        return self.get("tool", "mapping")
+        return self.get("tool", "mapping").strip().lower()
 
     @property
     def peakcalltool(self):
-        return self.get("tool", "peak_calling")
+        return self.get("tool", "peak_calling").strip().lower()
 
     @property
     def seq_type(self):
