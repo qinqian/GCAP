@@ -29,7 +29,7 @@ def peaks_reps_preprocess(workflow, conf):
         ## awk and bedClip to remove outlier location from above input
         attach_back(workflow,
             ShellCommand(
-                "sed 1d {input} | {tool} '{{if ($2 >= 0 && $2 < $3) print}}' - > {output}",
+                "sed 1d {input} | {tool} '{{if ($2 >= 0 && $2 < $3) print}}' - | sort-bed -  | bedops -m - > {output}",
                 tool="awk",
                 input = input_peaks,
                 output = input_peaks + ".tmp",
@@ -124,7 +124,7 @@ def peaks_reps_evaluating(workflow, conf, tex):
                 another_rep =  conf.treatment_targets[j] + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
             attach_back(workflow,
                 ShellCommand(
-                    "{tool} -u -a {input[one_rep]} -b {input[another_rep]} > {output}",
+                    "{tool} -a {input[one_rep]} -b {input[another_rep]} > {output}",
                     tool="intersectBed",
                     input = {"one_rep": one_rep,
                              "another_rep": another_rep},
@@ -174,7 +174,8 @@ def peaks_reps_evaluating(workflow, conf, tex):
     union = attach_back(workflow, ShellCommand(
         "{tool} -m {param[reps]} > {output[union]}",
         tool = "bedops",
-        input = {"beds": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" for target in conf.treatment_targets ]},
+        input = {"beds": [ target + "_5M_velcro_non_overlap_hotspot.bed.final" if conf.peakcalltool == "hotspot" else target + "_5M_macs2_velcro_non_overlap_peaks.bed.final"
+                           for target in conf.treatment_targets ]},
         output = {"union": conf.prefix + "_hotspot_5M_union.bed"}))
     union.param.update({"reps": " ".join(union.input['beds'])})
 

@@ -1,6 +1,6 @@
 %# document for DNase QC report
 %# Qin Qian
-%# Time-stamp: < modified by qinqianhappy :2013-05-25 17:44:02 >
+%# Time-stamp: < modified by qinqianhappy :2013-08-01 21:32:22 >
 
 %- if section_name == "begin"
 \documentclass[12pt,a4paper]{article}
@@ -161,11 +161,11 @@
 %- endif
 
 %- if section_name == "replicates"
-  \midrule
-  Replicates Overlap (5M) & I/U $>$ 50\% & \multicolumn{3}{c}{\VAR{overlap | join(' ; ')}} \\
-
-  \midrule
-  Rep Wig Corr in Union Peaks (5M) & $>$0.75 & \multicolumn{3}{c}{\VAR{cor | join(' ; ')}} \\
+%#  \midrule
+%#   Replicates Overlap (5M) & I/U $>$ 50\% & \multicolumn{3}{c}{\VAR{overlap | join(' ; ')}} \\
+% # 
+   \midrule
+   Rep Wig Corr in Union Peaks (5M) & $>$0.75 & \multicolumn{3}{c}{\VAR{cor | join(' ; ')}} \\
 %- endif
 
 %# no promotor evaluation in ENCODE 3 DNase QC, to uncomment if needed

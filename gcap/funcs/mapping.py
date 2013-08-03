@@ -17,37 +17,145 @@ def _bowtie(workflow, conf):
     To increase mapping ratio
     3 times mapping, take 50bp as example, step is controlled in the conf files:
         1. 28 bp 2. 40bp 3. 50bp
-    ## TODO: Try to define proper mapping reads length level
+    from short to long, to increase mapping speed
     """
+    steps = [ int(conf.get("Basis", "read_length")) - 28, int((int(conf.get("Basis", "read_length")) - 28) / 2), 0 ]
+
     if conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
-            bowtie = attach_back(workflow,
-                ShellCommand(
-                    "{tool} -n 1 -p {param[threads]} -S -m {param[max_align]} \
-                    {param[genome_index]} {input[fastq]} {output[sam]} 2> {output[bowtie_summary]}",
-                    input={"fastq": raw},
-                    output={"sam": target + "_all.sam",
-                            "bowtie_summary": target + "all_um_summary.txt"},
-                    tool="bowtie",
-                    param={"threads": 4,
-                           "max_align": 1,
-                           "genome_index": conf.get_path("lib", "genome_index")}))
-            bowtie.update(param = conf.items("bowtie"))
-
+            if conf.get("bowtie", "three_step").strip().upper() == "T" and steps[0] > 0 and steps[1] > 0: ## hidden options
+                bowtie1 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -n 1 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} {input[fastq]} --un {output[unmap]} > {output[sam]}",
+                        input={"fastq": raw},
+                        output={"sam": target + "_1.sam",
+                                "unmap": target + "_un1.fastq"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index"),
+                               "cut": steps[0]}))
+                bowtie1.update(param = conf.items("bowtie"))
+                bowtie2 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -n 1 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} {input[fastq]} --un {output[unmap]} > {output[sam]}",
+                        input={"fastq": target + "_un1.fastq"},
+                        output={"sam": target + "_2.sam",
+                                "unmap": target + "_un2.fastq"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "cut": steps[1],
+                               "genome_index": conf.get_path("lib", "genome_index")}))
+                bowtie2.update(param = conf.items("bowtie"))
+                bowtie3 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -n 1 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} {input[fastq]} > {output[sam]}",
+                        input={"fastq": target + "_un2.fastq"},
+                        output={"sam": target + "_3.sam"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index"),
+                               "cut": steps[2]}))
+                bowtie3.update(param = conf.items("bowtie"))
+                ## for two sam merge, cat sam1 <(grep -v '^@' sam2) > merged_sam.sam
+                cat_sams = attach_back(workflow,
+                                       ShellCommand(
+                                           "cat {param[input]} | grep -v ^@ > {param[body]} && \
+                                           {tool} view -SH {input[0]} > {param[header]} && \
+                                           cat {param[header]} {param[body]} > {output}",
+                                           tool = "samtools",
+                                           input = [ target + "_%s.sam" % str(i) for i in range(1,4) ],
+                                           output = target + "_all.sam",
+                                           param = {"body": target + "_all_tmp.sam",
+                                                    "header": target + "_sam_header"},
+                                           name = "three step bowtie"))
+                cat_sams.param["input"] = " ".join(cat_sams.input)
+            else:
+                bowtie = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -n 1 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} {input[fastq]} {output[sam]} 2> {output[bowtie_summary]}",
+                        input={"fastq": raw},
+                        output={"sam": target + "_all.sam",
+                                "bowtie_summary": target + "all_um_summary.txt"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index")}))
+                bowtie.update(param = conf.items("bowtie"))
     elif conf.seq_type == "pe":
-        for n, target in enumerate(conf.treatment_targets):
-            bowtie = attach_back(workflow,
-                ShellCommand(
-                    "{tool} -X 600 --chunkmbs 300 -n 1 -p {param[threads]} -S -m {param[max_align]} \
-                    {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} {output[sam]} 2> {output[bowtie_summary]}",
-                    input={"fastq": conf.treatment_raws[n]},
-                    output={"sam": target + "_all.sam",
-                            "bowtie_summary": target + "all_um_summary.txt"},
-                    tool="bowtie",
-                    param={"threads": 4,
-                           "max_align": 1,
-                           "genome_index": conf.get_path("lib", "genome_index")}))
-            bowtie.update(param = conf.items("bowtie"))
+        if conf.get("bowtie", "three_step").strip().upper() == "T" and steps[0] > 0 and steps[1] > 0: ## hidden options:
+            for n, target in enumerate(conf.treatment_targets):
+                bowtie1 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -X 600 --chunkmbs 300 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} --un {param[unmap]} > {output[sam]}",
+                        input={"fastq": conf.treatment_raws[n]},
+                        output={"sam": target + "_1.sam",
+                                "unmap": [ target + "_un1_%s.fastq" % i for i in range(1,3) ]},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index"),
+                               "unmap": target + "_un1.fastq",
+                               "cut": steps[0]}))
+                bowtie1.update(param = conf.items("bowtie"))
+                bowtie2 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -X 600 --chunkmbs 300 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} --un {output[unmap]} > {output[sam]}",
+                        input={"fastq": [ target + "_un1_%s.fastq" % i for i in range(1,3) ]},
+                        output={"sam": target + "_2.sam",
+                                "unmap": [ target + "_un2_%s.fastq" % i for i in range(1,3) ]},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index"),
+                               "cut": steps[1]}))
+                bowtie2.update(param = conf.items("bowtie"))
+                bowtie3 = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -3 {param[cut]} -X 600 --chunkmbs 300 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} > {output[sam]}",
+                        input={"fastq": [ target + "_un2_%s.fastq" % i for i in range(1,3) ]},
+                        output={"sam": target + "_3.sam"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index"),
+                               "cut": steps[2]}))
+                bowtie3.update(param = conf.items("bowtie"))
+                cat_sams = attach_back(workflow,
+                                       ShellCommand(
+                                           "cat {param[input]} | grep -v ^@ > {param[body]} && \
+                                           {tool} view -SH {input[0]} > {param[header]} && \
+                                           cat {param[header]} {param[body]} > {output}",
+                                           tool = "samtools",
+                                           input = [ target + "_%s.sam" % str(i) for i in range(1,4) ],
+                                           output = target + "_all.sam",
+                                           param = {"body": target + "_all_tmp.sam",
+                                                    "header": target + "_sam_header"},
+                                           name = "three step bowtie"))
+                cat_sams.param["input"] = " ".join(cat_sams.input)
+        else:
+            for n, target in enumerate(conf.treatment_targets):
+                bowtie = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} -X 600 --chunkmbs 300 -n 1 -p {param[threads]} -S -m {param[max_align]} \
+                        {param[genome_index]} -1 {input[fastq][0]} -2 {input[fastq][1]} {output[sam]} 2> {output[bowtie_summary]}",
+                        input={"fastq": conf.treatment_raws[n]},
+                        output={"sam": target + "_all.sam",
+                                "bowtie_summary": target + "all_um_summary.txt"},
+                        tool="bowtie",
+                        param={"threads": 4,
+                               "max_align": 1,
+                               "genome_index": conf.get_path("lib", "genome_index")}))
+                bowtie.update(param = conf.items("bowtie"))
 
 ## default bwa command line for pair end and single end DNase
 def _bwa(workflow, conf):
@@ -212,7 +320,7 @@ def reads_doc(input = {"tex": "", "json_autosome": ""},
     ## json = json_load(input["json"])["stat"]
     ## use correct order
 
-    if param["seq_type"] == "se":
+    if param["seq_type"] == "se" or param["seq_type"].strip().split()[1].strip().lower():
         raw =  [ count_in_million(int(json_au[s]["total"])) for s in param["samples"] ]
         total = sum([int(json_au[j]["total"]) for j in json_au])
         mapped_number = [ int(json_au[s]["map"]) for s in param["samples"] ]
@@ -272,7 +380,7 @@ def reads_mapping(workflow, conf, tex):
     Sam or Bam input, only do statistics
     """
     if conf.maptool == "bowtie":
-        _bowtie(workflow, conf)
+        _bowtie(workflow, conf) ## three steps mapping
     elif conf.maptool == "bwa":
         _bwa(workflow, conf)
 

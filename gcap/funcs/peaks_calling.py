@@ -1,5 +1,4 @@
 
-__author__ = 'qinqianhappy'
 ###############################################################
 #
 # 1. peaks calling by hotspot v4 default, alternative macs2
@@ -113,8 +112,8 @@ def _hotspot_on_replicates(workflow, conf, tex):
 	*-final/tag.density.starch      20bp resolution, converted to bigwiggle
     """
     if conf.seq_type.startswith("bed"):
-        kind = "_all.bed.starch"
-        suffix = "_5M.bed.starch"
+        kind = ".bed.starch"
+        suffix = "_5M_sort.bed.starch"
     else:
         kind = ".bam"
         suffix = "_5M_sort.bam"
@@ -341,7 +340,7 @@ def _macs2_on_reps(workflow, conf, tex):
         ## keep all duplicate tags as hotspot
         macs2_on_rep = attach_back(workflow,
             ShellCommand(
-                "{tool} callpeak -B -q {param[fdr]} -f {param[format]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                "{tool} callpeak -B -q {param[fdr]} -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + kind},
@@ -395,7 +394,7 @@ def _macs2_on_reps(workflow, conf, tex):
         ## keep all duplicate tags as hotspot
         macs2_on_rep = attach_back(workflow,
             ShellCommand(
-                "{tool} callpeak -B -q {param[fdr]} -g {param[species]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
+                "{tool} callpeak -B -q {param[fdr]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + suffix},
