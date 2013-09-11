@@ -65,22 +65,31 @@ NOTE:
     For building index, use genome fasta files with standard chromosome names,
     such as '>chr1', it's required for census and peaks calling tools, for human, you could download fasta from <compbio.tongji.edu.cn/~qinq/hg19.fa>.
 
-4. Use corresponding mapping tool and mapping index. e.g:
+4. Use corresponding mapping tool, mapping index and related parameters. e.g:
 
 fill in conf:    
 
     [tool]
     mapping = bwa
+
+    [bwa]
+    threads = 4
+
     [lib]
     genome_index = absolute_path_to_bwa_index
     or 
     [tool]
     mapping = bowtie
+
     [lib]
     genome_index = absolute_path_to_bowtie_index
+
+    [bowtie]
+    threads = 4
+    three_step = F ## shut down -3 parameters, T for 3 steps mapping, such as 50bp, 39bp, 28bp
     
     [contaminate]
-	## use bowtie index to fast evaluate library purity
+	## use only bowtie index to fast evaluate library purity
 	hg19 = absolute_path_to_bowtie_index
 	mm9 = absolute_path_to_bowtie_index
 	rn4 = absolute_path_to_bowtie_index
@@ -512,6 +521,10 @@ the 1.conf, 2.conf, 3.conf is written up to the requirements of above conf, then
 
 ## Change Log
 
+Latest Update 2013.9.5: add new sampling method by locations.
+Need shuf from GNU coreutils for better performance, under tested, not merged into main function.
+    https://apps.ubuntu.com/cat/applications/precise/coreutils/
+
 `Update`: use lastest fastqStatsAndSubsample(fastq sampling) implemented by Jim Kent, Jim's suggestions on using `latest samtools sampling`, `samtools view -s`(sam,bam sampling), remove
 dependency of FastQC.
 
@@ -530,18 +543,28 @@ If your SAM/BAM files are not original mapping results, you may need `Restoring 
 
 ##### Uniquely mapped reads
 ###### For BWA
+default -n is 3, `XA:` only keep no more than 3 hits.
+Some XT:A:U and XT:A:R don't have XA: tag, because multiple hits number is less than -n value, default is used.
 use samtools to extract uniquely mapped reads
+For single end data:
 a) samtools view sample.bam | grep XT:A:U | wc -l 
 	or grep XT:A:U sample.sam | wc -l
 b) samtools view sample.bam | grep -v XT:A:R | wc -l ## do not exclude unmapped reads
-c) samtools view -bq1 sample.bam | wc -l   ### as samtools faq told as reliable mapped <http://sourceforge.net/apps/mediawiki/samtools/index.php?title=SAM_FAQ#I_want_to_get_.60unique.27_alignments_from_SAM.2FBAM.>
+For pair end data:
+a) unique pair of reads both have XT:A:U
+b) redundant pair of reads usually have one pair with XT:A:U, another with XT:A:R
+For both PE and SE, to keep reliable reads:
+    samtools view -bq1 sample.bam | wc -l   ### as samtools faq told as reliable mapped <http://sourceforge.net/apps/mediawiki/samtools/index.php?title=SAM_FAQ#I_want_to_get_.60unique.27_alignments_from_SAM.2FBAM.>
 TAGS XT:A:R and XT:A:U both have situations with duplicated locations, no matter their scores equal 0 or larger than 0, duplicates and unique reads all have reliable situations.
+
+For SE and PE data, when mapping with bowtie, we exclude chrX, chrY and chrM to calculate mappable ratio.
+when mapping with bwa, we filter reads with MAPQ >=1 and autosome requirement.
 
 XT:A:R has 0, >1 MapQ and single or multiple locations example:
   
 	HWI-ST389:264:D0VYWACXX:4:1101:1322:2155        99      chrY    2351610 0       50M     =       2351738 178     CCATGCAGCTGTTTTAATCAGCAATTCTGAGAAGACACAAATGCCCCCCG      @C@FFFFFHHHHHIIJGIIGHGHGJIIIJHHGIJJFEGJIJIIIIGGJIJ      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:2  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chrX,+2401610,50M,0;
 	HWI-ST389:264:D0VYWACXX:4:1101:1322:2155        147     chrY    2351738 0       50M     =       2351610 -178    GAGCCCAGAGTGTGCGATCTGAGCTGTTTCTCAAACCAGGACAAATAAGT      HGH@>HGHCGGIGIGEDIIHDEIGIIIIIIIIIFCIIHDFDHEDAFFC@@      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:2  X1:i:0  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chrY,-2351738,50M,0;
-	## single location
+	## single location, this may be caused by -n option
 	HWI-ST389:264:D0VYWACXX:4:1101:9357:2101        99      chr5    69542867        0       50M     =       69542938        121     NTGCGCACTGACTAAAGATCAGAGCAGAAAGCAGATTCTAGGAACAGTCA      #1=DDFFFHHHHHJJJJJJJJJJJJJJJJJIJIJJIJJJIJIGIJJJIJI      XT:A:R  NM:i:1  SM:i:0  AM:i:0  X0:i:4  X1:i:4  XM:i:1  XO:i:0  XG:i:0  MD:Z:0C49
 	HWI-ST389:264:D0VYWACXX:4:1101:9357:2101        147     chr5    69542938        0       50M     =       69542867        -121    TCGGCATGCAACAAAATTCAAAGTAAATAGTGGTAAGGTGGGAAATGGAC      HIJIIJIJIGJJJJJJIIIIIJJIIJJIGIHJIIGJJHHHHHFFFFFC@C      XT:A:R  NM:i:0  SM:i:0  AM:i:0  X0:i:8  X1:i:1  XM:i:0  XO:i:0  XG:i:0  MD:Z:50
 	## MapQ > 1
@@ -551,12 +574,12 @@ XT:A:R has 0, >1 MapQ and single or multiple locations example:
 XT:A:U has > 1 MapQ and one pair multiple locations example:
 
 	HWI-ST389:264:D0VYWACXX:4:1101:6110:2188        83      chr15   66712700        33      50M     =       66712461        -289    TTTGAGACCAGCCTGGGCAACATGGCGAAACCCAGTCTCTACAAAAAGTA      JJJJJJHJJIJJJJJJJJJIJJJJJIJIHFJJJJJJJHHHHHFFFFFCCC      XT:A:U  NM:i:0  SM:i:13 AM:i:13 X0:i:1  X1:i:10 XM:i:0  XO:i:0  XG:i:0  MD:Z:50
-	HWI-ST389:264:D0VYWACXX:4:1101:6110:2188        163     chr15   66712461        33      50M     =       66712700        289     		AGTCCCAGCTACTCGGGAGGCTGAGGAATGAGAATCACTTGAACCGGGGA      CCBFFFFFHHHHHJJJJJJJJJJIJJIJIJIIIJIIJIJJIJJJJJJJJ=      XT:A:U  NM:i:0  SM:i:20 AM:i:13 X0:i:1  X1:i:2  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chr11,-89057190,50M,1;chr2,-32834036,50M,1;
+	HWI-ST389:264:D0VYWACXX:4:1101:6110:2188        163     chr15   66712461        33      50M     =       66712700        289     AGTCCCAGCTACTCGGGAGGCTGAGGAATGAGAATCACTTGAACCGGGGA      CCBFFFFFHHHHHJJJJJJJJJJIJJIJIJIIIJIIJIJJIJJJJJJJJ=      XT:A:U  NM:i:0  SM:i:20 AM:i:13 X0:i:1  X1:i:2  XM:i:0  XO:i:0  XG:i:0  MD:Z:50 XA:Z:chr11,-89057190,50M,1;chr2,-32834036,50M,1;
 
 `We decide to use this to get XT:A:U tag in combination with MapQ >= 1 to get uniquely mapped reads for SE and PE`.
 	
 ###### For bowtie
-Use `-m 1` to only report uniquely mapped reads, and use shell extract autosome mapped reads.
+Use `-m 1`  with `--best --strata` to only report uniquely mapped reads and one location from reads with multiple hits, and use shell to do statistics of autosome mappable reads.
 
 ###### sort by name
  samtools sort -n <in.bam> <byname.bam>
