@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-python2.7 to draw summary from json files, wait to adjust
+run gcap pararell
 """
 from optparse import OptionParser
 from ConfigParser import ConfigParser
@@ -33,12 +33,13 @@ def main():
             cf.set("Basis", "species", line[1])
             cf.set("Basis", "treat", line[2])
             if len(line) < 4:
-		    cf.set("Basis", "control", "")
+                cf.set("Basis", "control", "")
             else:
-		    cf.set("Basis", "control", line[3])
-            cf.set("Basis", "output", os.path.abspath(line[0]))
+                cf.set("Basis", "control", line[3])
+                cf.set("Basis", "output", os.path.abspath(line[0]))
             cf.write(open(line[0] + ".conf", "w"))
 
+            ## write in environment setting
             bash = """
 #!/bin/bash
 

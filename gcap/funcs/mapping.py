@@ -5,9 +5,8 @@
 #
 #########################################################
 
-import random, os
 from samflow.command import ShellCommand, PythonCommand
-from samflow.workflow import Workflow, attach_back
+from samflow.workflow import attach_back
 from pkg_resources import resource_filename
 from gcap.funcs.helpers import *
 
@@ -21,7 +20,6 @@ def _bowtie(workflow, conf):
     """
     steps = [ int(conf.get("Basis", "read_length")) - 28, int((int(conf.get("Basis", "read_length")) - 28) / 2), 0 ]
 
-    ## TODO: which direction is better, add --max ?
     ## --al align.fastq --un not_align.fastq --max (-m suppress.fastq, we use these to get mappable reads and then calculate reliable reads, )
     steps = steps[::-1]
     if conf.seq_type == "se":
@@ -175,9 +173,7 @@ def _bowtie(workflow, conf):
 def _bwa(workflow, conf):
     """
     incorpate ENCODE ChIP-seq alignment parameters
-
     """
-    ## TODO: how to trim in bwa
     if conf.seq_type == "pe":
         for n, target in enumerate(conf.treatment_targets):
             for pair in conf.treatment_raws[n]:
@@ -438,14 +434,17 @@ def reads_mapping(workflow, conf, tex):
             if not conf.seq_type.startswith("bam"):
                 attach_back(workflow,
                     ShellCommand(
-                        "{tool} view -bt {input[chrom_len]} {input[sam]} -o {output[bam]}",
+                        "{tool} view -bq {param[map_quality]} -t {input[chrom_len]} {input[sam]} -o {output[bam]}",
                         tool="samtools",
                         input={"sam": target + "_all.sam", "chrom_len": conf.get_path("lib", "chrom_len")},
-                        output={"bam": target + ".bam"}))
+                        output={"bam": target + ".bam"},
+                        param = {"map_quality": 1} ## to filter unreliable mapping
+                    ))
                 workflow.update(param=conf.items("lib"))
             else:
-                ## BAM input Files do not need to convert
+                ## filtered BAM input Files do not need to convert
                 link = attach_back(workflow, ShellCommand(
+                    ## filter or not, it's up to the user
                     "{tool} -sf {input[bam]} {output[bam]}",
                     tool = "ln",
                     input = {"bam": conf.treatment_bam[n]},

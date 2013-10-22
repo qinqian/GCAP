@@ -1,13 +1,13 @@
-__author__ = 'qinqianhappy'
-
 #########################################################
 #
 # union DHS evaluation
+# add cutting bias borrowed from Tarela
 #
 #########################################################
 from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import Workflow, attach_back
 from gcap.funcs.helpers import *
+from pkg_resources import resource_filename
 
 def union_DHS_overlap(workflow, conf, tex):
     """ use hotspot d narrow peaks for DHS evaluation """
@@ -28,6 +28,33 @@ def union_DHS_overlap(workflow, conf, tex):
                        "DHS_peaks_bed": conf.get("lib", "dhs")},
                 output = output,
                 name = "Write out DHS overlap BED"))
+
+        ## for hotspot only now, support BED files, not fully tested
+        if conf.get("cut_bias", "run").strip().upper() == "T":
+            if "bed" in conf.seq_type:
+                cut = attach_back(workflow,
+                    ShellCommand(
+                        "{tool} {param[script]} -p {input[peaks]} -s {input[bit]} -o {output[matrix]} -f {param[mer]} -t {input[tag]}",
+                        tool = "python2.7",
+                        input = {"peaks": conf.get("lib", "dhs"), "bit": conf.get("cut_bias", "seq_2bit"),
+                                 "tag": target + "_all.bed"},
+                        output = {"matrix": conf.treatment_targets[i] + "_cut_bias.xls"},
+                        param = {"mer": 3, "script": resource_filename("gcap", "pipeline-scripts/twobit_seqbias.py")},
+                        name = "cutting bias"))
+                cut.update(param = conf.items("cut_bias"))
+            else:
+                cut = attach_back(workflow,
+                    ShellCommand(
+                        "bamToBed -i {input[tag]} > {output[tag]} && {tool} {param[script]} -p {input[peaks]} -s {input[bit]} -o {output[matrix]} -f {param[mer]} -t {output[tag]}",
+                        tool = "python2.7",
+                        input = {"peaks": conf.get("lib", "dhs"), "bit": conf.get("cut_bias", "seq_2bit"),
+                                 "tag": target + ".bam"},
+                        output = {"tag": target + "_cut_input.bed", "matrix": conf.treatment_targets[i] + "_cut_bias.xls"},
+                        param = {"mer": 3, "script": resource_filename("gcap", "pipeline-scripts/twobit_seqbias.py")},
+                        name = "cutting bias"))
+                cut.update(param = conf.items("cut_bias"))
+
+
     attach_back(workflow, PythonCommand(
         stat_dhs,
         input={"dhs_peaks": [ target + "_DHS_overlap_peaks_bed" if conf.peakcalltool == "hotspot" else target + "_macs2_DHS_overlap_peaks_bed"
@@ -42,6 +69,7 @@ def union_DHS_overlap(workflow, conf, tex):
         input = {"tex": tex, "json": conf.json_prefix + "_dhs.json"},
         output = {"latex": conf.latex_prefix + "_dhs.tex"},
         param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases}))
+
 
 def stat_dhs(input={"pks_spot_bed": "", "dhs_peaks": ""}, output={"json": ""},
              param={"samples": ""}):

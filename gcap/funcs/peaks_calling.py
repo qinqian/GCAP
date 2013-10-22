@@ -12,10 +12,11 @@
 ###############################################################
 from gcap.funcs.reps_quality import peaks_reps_preprocess, peaks_reps_evaluating
 from samflow.command import ShellCommand, PythonCommand
-from samflow.workflow import Workflow, attach_back
+from samflow.workflow import attach_back
 from gcap.funcs.helpers import *
 from gcap.funcs.library_complexity import stat_redun_census, redundancy_doc
 
+from pkg_resources import resource_filename
 from pkg_resources import resource_filename
 
 ## for hotspot conf file and pipeline shell scripts
@@ -344,7 +345,7 @@ def _macs2_on_reps(workflow, conf, tex):
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + kind},
-                output={"peaks": target + "_macs2_all_peaks.bed",
+                output={"peaks": target + "_macs2_all_peaks.narrowPeak",
                         "summit": target + "_macs2_all_summits.bed",
                         "treat_bdg": target + "_macs2_all_treat_pileup.bdg",
                         "peaks_xls": target + "_macs2_all_peaks.xls",
@@ -398,7 +399,7 @@ def _macs2_on_reps(workflow, conf, tex):
                 {param[treat_opt]} -n {param[description]}",
                 tool="macs2",
                 input={"treat": target + suffix},
-                output={"peaks": target + "_5M_macs2_peaks.bed",
+                output={"peaks": target + "_5M_macs2_peaks.narrowPeak",
                         "summit": target + "_5M_macs2_summits.bed",
                         "treat_bdg": target + "_5M_macs2_treat_pileup.bdg",
                         "peaks_xls": target + "_5M_macs2_peaks.xls",
@@ -424,8 +425,8 @@ def _macs2_on_reps(workflow, conf, tex):
         attach_back(workflow, ShellCommand(
             "{tool} {input[starch]} {input[bed]}",
             tool = "macs2_spot.sh",
-            input = {"starch": target + suffix, "bed": target + "_5M_macs2_peaks.bed"},
-            output = target + "_5M_macs2_peaks.bed" + ".spot.out"))
+            input = {"starch": target + suffix, "bed": target + "_5M_macs2_peaks.narrowPeak"},
+            output = target + "_5M_macs2_peaks.narrowPeak" + ".spot.out"))
 
         ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
         ## filter bdg file to remove over-border coordinates
@@ -482,7 +483,7 @@ def _macs2_on_combo(workflow, conf):
         {param[treat_opt]} -n {param[description]}",
         tool="macs2",
         input={"merged": conf.prefix + kind},
-        output={"peaks": conf.prefix + "_peaks.bed",
+        output={"peaks": conf.prefix + "_peaks.narrowPeak",
                 "summit": conf.prefix + "_summits.bed",
                 "treat_bdg": conf.prefix + "_treat_pileup.bdg",
                 "peaks_xls": conf.prefix + "_peaks.xls",
@@ -556,16 +557,16 @@ def _peaks_calling_latex(workflow, conf, tex):
         if len(conf.treatment_pairs) >= 2:
             attach_back(workflow, PythonCommand(
                 stat_peaks,
-                input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
-                                   "5M_spot": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ],
-                                   "combo": conf.prefix + "_peaks.bed"}},
+                input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.narrowPeak" for target in conf.treatment_targets ],
+                                   "5M_spot": [ target + "_5M_macs2_peaks.narrowPeak" for target in conf.treatment_targets ],
+                                   "combo": conf.prefix + "_peaks.narrowPeak"}},
                 output = {"json": conf.json_prefix + "_peaks.json"},
                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
         else:
             attach_back(workflow, PythonCommand(
                 stat_peaks,
-                input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.bed" for target in conf.treatment_targets ],
-                                   "5M_spot": [ target + "_5M_macs2_peaks.bed" for target in conf.treatment_targets ]}},
+                input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.narrowPeak" for target in conf.treatment_targets ],
+                                   "5M_spot": [ target + "_5M_macs2_peaks.narrowPeak" for target in conf.treatment_targets ]}},
                 output = {"json": conf.json_prefix + "_peaks.json"},
                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
 
@@ -580,7 +581,7 @@ def _peaks_calling_latex(workflow, conf, tex):
     if conf.peakcalltool == "hotspot":
         spot = [ target + "_5M_sort.spot.out" for target in conf.treatment_targets ]
     elif conf.peakcalltool == "macs2":
-        spot = [ target + "_5M_macs2_peaks.bed" + ".spot.out" for target in conf.treatment_targets ]
+        spot = [ target + "_5M_macs2_peaks.narrowPeak" + ".spot.out" for target in conf.treatment_targets ]
 
     ## 5M reads, calculate the merged two passes and peaks regions number
     ## 5M reads for macs2 optionally

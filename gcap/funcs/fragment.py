@@ -1,23 +1,20 @@
 #########################################################
-#
 # fragment size evaluation
 #  1. pair end picard
 #  2. single end macs2
 #########################################################
 
 from samflow.command import ShellCommand, PythonCommand
-from samflow.workflow import Workflow, attach_back
-from gcap.funcs.sampling import *
+from samflow.workflow import attach_back
 from gcap.funcs.helpers import *
 
-## fragment picard and macs2 command line
 def fragment_size(workflow, conf, tex):
     """
     picard for PE,
     MACS2 for SE, because of background noise, we choose alternative fragment size closest to size selection
     """
-    ## picard for pair end
     if conf.seq_type == "pe":
+
         for target in conf.treatment_targets:
             insert_size = attach_back(workflow, ShellCommand(
                 "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
@@ -25,8 +22,7 @@ def fragment_size(workflow, conf, tex):
                 input = {"bam": target + "_5M_sort.bam"},
                 output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
                 param = {"threads": 4},
-                name = "Fragment size picard"
-            ))
+                name = "Fragment size picard"))
             insert_size.update(param = conf.items("picard"))
 
         attach_back(workflow, PythonCommand(
@@ -37,7 +33,9 @@ def fragment_size(workflow, conf, tex):
                      "frag_tool": "picard"}))
 
     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
+
         if conf.seq_type.split(",")[1].strip() == "pe":
+
             for target in conf.treatment_targets:
                 insert_size = attach_back(workflow, ShellCommand(
                     "{tool} -Xmx5g -XX:ParallelGCThreads={param[threads]} -jar {param[insertsize]} HISTOGRAM_FILE={output[pdf]} I={input[bam]} O={output[insert]} VALIDATION_STRINGENCY=SILENT",
@@ -46,12 +44,14 @@ def fragment_size(workflow, conf, tex):
                     output = {"pdf": target + "_picard_insert_5M.pdf", "insert": target + "_insert_metric.5M"},
                     param = {"threads": 4}))
                 insert_size.update(param = conf.items("picard"))
+
             attach_back(workflow, PythonCommand(
                 stat_frag_std,
                 input = {"insert": [ target + "_insert_metric.5M" for target in conf.treatment_targets ]},
                 output = {"json": conf.json_prefix + "_frag.json"},
                 param = {"samples": conf.treatment_bases,
                          "frag_tool": "picard"}))
+
         elif conf.seq_type.split(",")[1].strip() == "se":
             for target in conf.treatment_targets:
                 fragment_size = attach_back(workflow, ShellCommand(
@@ -69,6 +69,7 @@ def fragment_size(workflow, conf, tex):
                 param = {"samples": conf.treatment_bases,
                          "frag_tool": "macs2"},
                 name = "macs2 model R script parser"))
+
     elif conf.seq_type.startswith("bed"):
         for target in conf.treatment_targets:
             fragment_size = attach_back(workflow, ShellCommand(

@@ -17,18 +17,22 @@ def strand_cor(workflow, conf, tex):
     support BAM/SAM, fastq input
     """
     for target in conf.treatment_targets:
-        attach_back(workflow, ShellCommand(
-            "{tool} {param[spp]} -c={input[bam]} -out={output}",      ## no not need -savp, plot
+        spp = attach_back(workflow, ShellCommand(
+            "{tool} {param[spp]} -x={param[exclude]} -s={param[s]} -c={input[bam]} -out={output}",      ## no need for -savp, plot
             tool = "Rscript",
             input = {"bam": target + "_5M_sort.bam"},
             output = target + "_strand_cor",
-            param = {"spp": conf.get("tool", "spp")}))
-        ## add doc and json for NSC, RSC
+            param = {"spp": conf.get("tool", "spp"),
+                     "s": "-500:5:1500",
+                     "exclude": "-500:-1"}))
+        spp.param.update(conf.items("spp"))
+
     attach_back(workflow, PythonCommand(
         stat_strand_cor,
         input = {"metric": [target + "_strand_cor" for target in conf.treatment_targets]},
         output = {"json": conf.json_prefix + "_strand_cor.json"},
         param = {"samples": conf.treatment_bases}))
+
     attach_back(workflow, PythonCommand(
         strand_cor_doc,
         input = {"json": conf.json_prefix + "_strand_cor.json", "tex": tex},

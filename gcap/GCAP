@@ -153,7 +153,6 @@ def create_workflow(args, conf, tex):
 
     step_checker = StepChecker(args.start_step, args.end_step, skipped_steps)
 
-    has_dhs = conf.get("lib", "dhs")
     need_run = step_checker.need_run
 
     bld.attach_back(ShellCommand(
@@ -183,10 +182,8 @@ def create_workflow(args, conf, tex):
 
     if need_run(7):
         bld.build(call_peaks)
-    #    ## these two criteria, indirectly, optionally
-    #        bld.build(_promoter_overlap)
-    #        bld.build(_conservation)
-    if has_dhs and need_run(8):
+
+    if need_run(8):
         bld.build(union_DHS_overlap)
 
     if need_run(9):
