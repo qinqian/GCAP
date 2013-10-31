@@ -110,7 +110,7 @@ def _hotspot_on_replicates(workflow, conf, tex):
 	*-final/*.hot.bed               minimally thresholded hotspots( corresponding to hotspot v3 b, broad Peak)
 	*-final/*.fdr0.01.hot.bed       FDR thresholded hotspots  ( corresponding to hotspot v3 c)
 	*-final/*.fdr0.01.pks.bed       FDR thresholded peaks     ( corresponding to hotspot v3 d, narrow Peak)
-	*-final/tag.density.starch      20bp resolution, converted to bigwiggle
+	tag.density.starch              in target directory, 20bp resolution, converted to bigwiggle
     """
     if conf.seq_type.startswith("bed"):
         kind = ".bed.starch"

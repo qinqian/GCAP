@@ -29,8 +29,25 @@ def union_DHS_overlap(workflow, conf, tex):
                 output = output,
                 name = "Write out DHS overlap BED"))
 
-        ## for hotspot only now, support BED files, not fully tested
         if conf.get("cut_bias", "run").strip().upper() == "T":
+            ## cutting bias in stranded mode, a bit strange for ATAC-seq
+#            """
+#            dat=${1/bed/bam}
+#            chr=$2
+#            bedtools bamtobed -i $dat > ${dat}.bed
+#            awk '{if ($6=="+") print $0}' ${dat}.bed > ${dat}_plus.bed
+#            awk '{if ($6=="-") print $0}' ${dat}.bed > ${dat}_minus.bed
+#            macs2 pileup -i ${dat}_plus.bed -o ${dat}_plus.bdg -f BED --extsize 1
+#            macs2 pileup -i ${dat}_minus.bed -o ${dat}_minus.bdg -f BED --extsize 1
+#            bedClip ${dat}_plus.bdg $chr ${dat}_plus.clip
+#            bedGraphToBigWig -unc ${dat}_plus.clip $chr ${dat}_plus.bw
+#            bedClip ${dat}_minus.bdg $chr ${dat}_minus.clip
+#            bedGraphToBigWig -unc ${dat}_minus.clip $chr ${dat}_minus.bw
+#            rm -f ${dat}_plus.clip
+#            rm -f ${dat}_minus.clip
+#            """
+
+            ## TODO: add overall mode with make_bg_bwDHS_twobit.py
             if "bed" in conf.seq_type:
                 cut = attach_back(workflow,
                     ShellCommand(

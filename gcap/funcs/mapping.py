@@ -404,7 +404,7 @@ def reads_mapping(workflow, conf, tex):
         if conf.maptool == "bowtie":
             uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
         else:
-            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
+            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bwa.awk")
         for target in conf.treatment_targets:
             attach_back(workflow, ShellCommand(
                 "{tool} -f {param[script]} {input[sam]} > {output[count]}",

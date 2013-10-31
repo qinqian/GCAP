@@ -9,10 +9,8 @@
 from samflow.command import ShellCommand
 from samflow.workflow import attach_back
 
-def sample_reads(workflow, conf, N, format):
-    """
-    get random N reads from Fastq, SAM, BAM
-    """
+def sample_reads(workflow, conf, N, format):    ## sampling reads from multiple formats
+    """ get random N reads from Fastq, SAM, BAM """
     if format == "fastq":
         if conf.seq_type == "se" or conf.seq_type.strip().split(',')[0].strip().lower() in ['bam', 'sam']:
             for n, target in enumerate(conf.treatment_targets):

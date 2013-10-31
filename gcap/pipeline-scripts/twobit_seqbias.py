@@ -67,14 +67,14 @@ def seqbias(peak,tag,out,sequence,flank):
             if pcut.has_key(seq):
                 pcut[seq]+=1
             else:
-                print(seq)
+                ## print(seq) ## for reads shorter than 6
                 pass
         elif ll[5] == '-':
             seq = genome[ll[0]][(int(ll[2])-1-2):(int(ll[2])-1+4)].upper()
             if ncut.has_key(seq):
                 ncut[seq]+=1
             else:
-                print(seq)
+                ## print(seq) ## for reads shorter than 6
                 pass
     inf.close()
     outf = open(out,'w')
