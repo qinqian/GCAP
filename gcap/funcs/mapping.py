@@ -178,13 +178,14 @@ def _bwa(workflow, conf):
         for n, target in enumerate(conf.treatment_targets):
             for pair in conf.treatment_raws[n]:
                 bwa = attach_back(workflow, ShellCommand( ## -n INT/float  mismatch number or error rate
-                    "{tool} aln -n {param[mismatch]} -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
+                    "{tool} aln -q {param[quality]} -n {param[mismatch]} -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
                     tool = "bwa",
                     input = {"index": conf.get("lib", "genome_index"),
                              "fastq": pair},
                     output = {"sai": pair + ".sai"},
                     param = {"threads": 4,
-                             "mismatch": 2}))
+                             "mismatch": 2,
+                             "quality": 5}))
                 bwa.update(param = conf.items("bwa"))
             attach_back(workflow, ShellCommand(  ## -n INT maximum hits to output for paired reads, default 3, write in XA:Z alternative alignment
                 "{tool} sampe {input[index]} {input[sai][0]} {input[sai][1]} {input[fastq][0]} {input[fastq][1]} > {output[sam]}",

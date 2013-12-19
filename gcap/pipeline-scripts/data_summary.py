@@ -4,7 +4,7 @@
 ## TODO: uniform json and better extraction, write into GCAP function
 
 extract DNase data summary from GCAP pipeline
-testid_conserv.json  testid_contam.json  testid_dhs.json  testid_frag.json  testid_peaks.json 
+testid_conserv.json  testid_contam.json  testid_dhs.json  testid_frag.json  testid_peaks.json
 testid_promotor.json  testid_redun.json  testid_rep1_fastqc.json  testid_rep2_fastqc.json  testid_reps.json  testid_sample_spot_5M.json  testid_um_autosome.json
 """
 

@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-import re
 from glob import glob
 
 import argparse
-## samflow work control
-from samflow.command import ShellCommand, PythonCommand
-from samflow.workflow import Workflow, attach_back
 
 ## config file parser
-from gcap.config import Conf
+from gcap.funcs.config import Conf
 from gcap.funcs.fragment import fragment_size
-
 from gcap.funcs.library_complexity import library_complexity
 from gcap.funcs.nsc_rsc import strand_cor
 from gcap.funcs.pdf_report import report

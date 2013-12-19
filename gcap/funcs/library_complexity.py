@@ -58,6 +58,29 @@ def library_complexity(workflow, conf, tex):
                          "se_or_pe": "-s" if "se" in conf.seq_type else " "},
                 name = "census program"))
 
+#            ## PBC1, PBC2
+#            attach_back(workflow, ShellCommand(
+#                '''file={input[histo]}
+#                work=$(basename $file)
+#                prefix=${work%.*}
+#                suffix=$3
+#                proj=${2}/${prefix}
+#                {tool} '{l+=1;ul[$1"\t"$2"\t"$3"\t"$6]+=1} END {for (u in ul) print ul[u]}' ${proj}.${suffix} |\
+#                {tool} '{n[$1]+=1} END {for (i in n) print i"\t"n[i]}' > ${proj}.${suffix}.histo
+#                ''',
+#                tool = "awk", name = "PBC"))
+#
+#            ## Preseq
+#            attach_back(workflow, ShellCommand(
+#                '''
+#                sort -k1n ${proj}.${suffix}.histo > ${proj}.${suffix}.histo.sort
+#                ## time c_curve -o ${proj}.lib_complexity -H ${proj}.${suffix}.histo.sort
+#                ## library yield, extract up, so slow, not calculated yet
+#                ## lc_extrap -b 90 -e 10000000 -s 1000000 ${proj}.sort.bed -o ${proj}.future_yield
+#                time {tool} -H ${proj}.${suffix}.histo.sort -o ${proj}.future_yield
+#                ''',
+#                tool = "lc_extrap"))
+
         attach_back(workflow, PythonCommand(
             stat_redun_census,
             input = {"census": [target + "_census.metric" for target in conf.treatment_targets]},
@@ -114,7 +137,6 @@ def stat_redun_census(input = {"census": "", "redundancy": ""}, output = {"json"
             redun_ratio = open(b).read().strip().split()[0]
             json_dict["stat"][s] = redun_ratio
     json_dump(json_dict)
-
 
 def redundancy_doc(input = {"tex": "", "json": ""}, output = {"redun": ""}, param = {"reps": "", "samples": ""}):
 

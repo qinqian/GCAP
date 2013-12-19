@@ -335,7 +335,10 @@ filtered_dhs_bb is in <http://compbio.tongji.edu.cn/~qinq/lib/gcap_data/gcap_par
 Check whether `pdflatex`(pdflatex (Version 3.141592-1.21a-2.2 (Web2C 7.5.4))) is executable or not. For d
 python3 module `jinja2` is a template module for rendering latex document:
 
+
 	pip-3.2 install jinja2
+    # possible problem, use python >=3.3 with latest jinja2 version
+    # or use python3.2 with jinja 2.5
 	# for options
 	pip-3.2 install argparse
 
