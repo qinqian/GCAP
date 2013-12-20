@@ -21,7 +21,7 @@ def peaks_reps_preprocess(workflow, conf):
             input_peaks = conf.hotspot_reps_final_5M_prefix[i] + ".hot.bed"
             non_velcro = target + "_5M_velcro_non_overlap_hotspot.bed"
         elif conf.peakcalltool == "macs2":
-            input_peaks = target + "_5M_macs2_peaks.narrowPeak"
+            input_peaks = target + "_5M_macs2_peaks.encodePeak"
             non_velcro = target + "_5M_macs2_velcro_non_overlap_peaks.bed"
 
         ## awk and bedClip to remove outlier location from above input

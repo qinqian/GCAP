@@ -314,7 +314,7 @@ Replicates consistency
 * With the help of Jim, we would use `bigWigCorrelate`, it's built-in gcap/pipeline-scripts/bigWigCorrelate(added to $PATH, `bedToBigBed` is needed) for replicates consistency evaluation on union DHS regions(filted by blacklist).
 * For whole genome correlation, use `wigCorrelate`
 
-I made a compressed package for all needed binary, including fastqStatsAndSubsample,
+I made a compressed package for all needed binary, including fastqStatsAndSubsample(from <http://hgwdev.sdsc.edu/~kent/fix/>),
 <http://compbio.tongji.edu.cn/~qinq/lib/ucsc_tools/ucsc_tools.tar.gz>
 
 fill in conf files:

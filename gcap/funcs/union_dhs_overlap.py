@@ -83,7 +83,7 @@ def union_DHS_overlap(workflow, conf, tex):
                             intersectBed -a {input[motif]} -b {input[dhs]}.bed -wa -u > {output[motif_dhs]} """,
                             tool = "intersectBed",
                             input = {"motif": conf.get("footprint", "motif"),
-                                     "dhs": target + "_macs2_all_peaks.narrowPeak"},
+                                     "dhs": target + "_macs2_all_peaks.encodePeak"},
                             output = {"motif_dhs": target + "_motif_dhs.bed"}))
 
                 ### 2. scan for plotting data use python script, Scan_6c_matrix_cv_chip.py

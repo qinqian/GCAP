@@ -176,13 +176,14 @@ def _bwa(workflow, conf):
     """
     if conf.seq_type == "pe":
         for n, target in enumerate(conf.treatment_targets):
-            for pair in conf.treatment_raws[n]:
+            for i, pair in enumerate(conf.treatment_raws[n]):
+                print(target + "_pair_%s.sai" % i)
                 bwa = attach_back(workflow, ShellCommand( ## -n INT/float  mismatch number or error rate
                     "{tool} aln -q {param[quality]} -n {param[mismatch]} -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
                     tool = "bwa",
                     input = {"index": conf.get("lib", "genome_index"),
                              "fastq": pair},
-                    output = {"sai": pair + ".sai"},
+                    output = {"sai": target + "_pair_%s.sai" % (i+1)}, ## made input and output in two different directory
                     param = {"threads": 4,
                              "mismatch": 2,
                              "quality": 5}))
@@ -191,20 +192,22 @@ def _bwa(workflow, conf):
                 "{tool} sampe {input[index]} {input[sai][0]} {input[sai][1]} {input[fastq][0]} {input[fastq][1]} > {output[sam]}",
                 tool = "bwa",
                 input = {"index": conf.get("lib", "genome_index"),
-                         "fastq": [ pair for pair in conf.treatment_raws[n] ],
-                         "sai": [ pair + ".sai" for pair in conf.treatment_raws[n] ]},
+                         "sai": [ target + "_pair_%s.sai" % (j + 1)
+                                    for j, _ in enumerate(conf.treatment_raws[n]) ],
+                         "fastq": conf.treatment_raws[n]},
                 output = {"sam": target + "_all.sam"}))
 
     elif conf.seq_type == "se":
         for raw, target in conf.treatment_pairs:
             bwa = attach_back(workflow, ShellCommand(  ## -n INT/float  mismatch number or error rate
-                "{tool} aln -n {param[mismatch]}  -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
+                "{tool} aln -q {param[quality]} -n {param[mismatch]}  -t {param[threads]} {input[index]} {input[fastq]} > {output[sai]}",
                 tool = "bwa",
                 input = {"index": conf.get("lib", "genome_index"),
                          "fastq": raw},
                 output = {"sai": target + ".sai"},
                 param = {"threads": 4,
-                         "mismatch": 2}))
+                         "mismatch": 2,
+                         "quality": 5}))
             bwa.update(param = conf.items("bwa"))
             attach_back(workflow, ShellCommand(   ## -n INT maximum hits to output for paired reads
                 "{tool} samse {input[index]} {input[sai]} {input[fastq]} > {output[sam]}",
@@ -403,9 +406,13 @@ def reads_mapping(workflow, conf, tex):
     ## filter mitochondria, chrX, chrY tags
     if not conf.seq_type.startswith("bed"): ## reads BED files do not need to map
         if conf.maptool == "bowtie":
-            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
+            ## uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bowtie.awk")
+            uniq_tag = resource_filename("gcap", "pipeline-scripts/all_chr_uniq_map.awk")
         else:
-            uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bwa.awk")
+            ## uniq_tag = resource_filename("gcap", "pipeline-scripts/autosome_uniq_map_bwa.awk")
+            ## currently change to all chromosome reliable mapping ratio
+            uniq_tag = resource_filename("gcap", "pipeline-scripts/all_chr_uniq_map.awk")
+
         for target in conf.treatment_targets:
             attach_back(workflow, ShellCommand(
                 "{tool} -f {param[script]} {input[sam]} > {output[count]}",

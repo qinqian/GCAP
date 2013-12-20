@@ -57,25 +57,28 @@ def stat_fastqStat(input = {"seq": ""}, output = {"json": ""}, param = {"samples
                 data = f.readlines()
                 json_dict["stat"][s + "_pair1"] = {}
                 json_dict["stat"][s + "_pair1"]['count'] = data[0].strip().split()[1]
-                json_dict["stat"][s + "_pair1"]['quality'] = round(float(data[6].strip().split()[1]), 1)
-                json_dict["stat"][s + "_pair1"]['std'] = data[7].strip().split()[1]
-                json_dict["stat"][s + "_pair1"]['len'] = data[2].strip().split()[1]
+                json_dict["stat"][s + "_pair1"]['basecount'] = data[1].strip().split()[1]
+                json_dict["stat"][s + "_pair1"]['quality'] = round(float(data[8].strip().split()[1]), 1)
+                json_dict["stat"][s + "_pair1"]['std'] = data[9].strip().split()[1]
+                json_dict["stat"][s + "_pair1"]['len'] = data[4].strip().split()[1]
             with open(i[1]) as f:
                 data = f.readlines()
                 json_dict["stat"][s + "_pair2"] = {}
                 json_dict["stat"][s + "_pair2"]['count'] = data[0].strip().split()[1]
-                json_dict["stat"][s + "_pair2"]['quality'] = round(float(data[6].strip().split()[1]), 1)
-                json_dict["stat"][s + "_pair2"]['std'] = data[7].strip().split()[1]
-                json_dict["stat"][s + "_pair2"]['len'] = data[2].strip().split()[1]
+                json_dict["stat"][s + "_pair2"]['basecount'] = data[1].strip().split()[1]
+                json_dict["stat"][s + "_pair2"]['quality'] = round(float(data[8].strip().split()[1]), 1)
+                json_dict["stat"][s + "_pair2"]['std'] = data[9].strip().split()[1]
+                json_dict["stat"][s + "_pair2"]['len'] = data[4].strip().split()[1]
     if param["seq_type"] in ["se", "bam", "sam"]:
         for i, s in zip(input['seq'], param['samples']):
             with open(i) as f:
                 data = f.readlines()
                 json_dict["stat"][s] = {}
                 json_dict["stat"][s]['count'] = data[0].strip().split()[1]
-                json_dict["stat"][s]['quality'] = data[6].strip().split()[1]
-                json_dict["stat"][s]['std'] = data[7].strip().split()[1]
-                json_dict["stat"][s]['len'] = data[2].strip().split()[1]
+                json_dict["stat"][s]['basecount'] = data[1].strip().split()[1]
+                json_dict["stat"][s]['quality'] = data[8].strip().split()[1]
+                json_dict["stat"][s]['std'] = data[9].strip().split()[1]
+                json_dict["stat"][s]['len'] = data[4].strip().split()[1]
     json_dump(json_dict)
 
 ## parse json files to latex reads length and sequence quality part
