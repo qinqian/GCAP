@@ -51,8 +51,8 @@ def report(workflow, conf, tex):
 
     integrate_doc = attach_back(workflow, ShellCommand(
         "cat {param[input]} > {output[tex]} \
-         && {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}\
-         && {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}",
+         || {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}\
+         || {tool} -output-directory {output[dir]} -jobname={param[name]} {output[tex]}",
         tool="pdflatex",
         input= collector[0],
         # output[pdf] should use "conf.prefix" to have the absolute path

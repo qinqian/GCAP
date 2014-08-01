@@ -1,4 +1,3 @@
-__author__ = 'qinqianhappy'
 #########################################################
 #
 # library complexity evaluation
@@ -12,8 +11,7 @@ from gcap.funcs.helpers import *
 from gcap.funcs.sampling import *
 
 def library_complexity(workflow, conf, tex):
-    """  sampling 5M reads for following analysis
-    use 5M raw reads for estimation
+    """  sampling reads for following analysis use raw reads for estimation
     """
     ## choose sampling modes
     if not conf.seq_type.startswith("bed"):

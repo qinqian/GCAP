@@ -13,6 +13,8 @@ GCAP is easy to start
     GCAP run -c config
 
 
+We suggest using virtualenv to avoid python version library conflicts.
+
 Links
 `````
 
@@ -23,30 +25,74 @@ Links
 """
 
 from setuptools import setup
+from configparser import SafeConfigParser
+import os
 
-setup(
-    name='GCAP',
-    version='1.0',
-    packages=['gcap', "gcap.funcs"],
-    url='https://github.com/qinqian/GCAP',
-    license='MIT',
-    author='Qian Qin',
-    author_email='qinqianhappy@gmail.com',
-    description='DNase I seq QC pipeline',
-    long_description = __doc__,
-    scripts = ["gcap/GCAP", "gcap/pipeline-scripts/bed_duplicates.sh", "gcap/pipeline-scripts/script-tokenizer.py",
-               "gcap/pipeline-scripts/runhotspot", "gcap/pipeline-scripts/macs2_spot.sh"],
-    requires=["samflow", "jinja2", "argparse"],
-    package_data = {"gcap" : ["static/*", "pipeline-scripts/*"]},
-    classifiers=[
-        'Development Status :: 4 - Beta',
-        'Environment :: Console',
-        'Intended Audience :: Developers',
-        'Intended Audience :: End Users/Desktop',
-        'License :: OSI Approved :: Python Software Foundation License',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: POSIX',
-        'Programming Language :: Python :: 3',
-        'Topic :: Software Development :: Libraries :: Python Modules'
+version = str(1.1)
+
+def generate_defaults():
+    """Tries to generate the default run configuration files from the
+    paths specified in chilin.conf.  The idea is that an admin, who is
+    installing ChiLin system-wide could define the defaults which will allow
+    users to avoid generating/editing conf files!!
+    """
+
+    cf = SafeConfigParser()
+    cf.add_section('basics')
+    ls = ['id', 'time', 'species', 'input', 'output', 'threads']
+    for fld in ls:
+        cf.set('basics', fld, '$'+fld.upper())
+    #SET the chilin version number
+    cf.set('basics', "version", version)
+
+    #read in the chilin.conf file--look first for developer defaults
+    if os.path.exists('gcap.conf.filled'):
+        cf.read('gcap.conf.filled')
+    else:
+        cf.read('gcap.conf')
+
+    #write the template file!
+    f = open(os.path.join('gcap','static','gcap.conf.filled'),'w')
+    cf.write(f)
+    f.close()
+
+
+def main():
+    if os.path.exists("gcap.conf"):
+        generate_defaults()
+
+    setup(
+        name='GCAP',
+        version=version,
+        packages=['gcap', "gcap.funcs", "samflow"],
+        url='https://github.com/qinqian/GCAP',
+        license='',
+        author='Qian Qin',
+        author_email='qianqind@gmail.com',
+        description='DNase I seq QC pipeline',
+        long_description = __doc__,
+        scripts = ["gcap/GCAP",
+                   "gcap/glue/dac_se_read_quality",
+                   "gcap/glue/dac_pe_read_quality",
+                   "gcap/glue/eap_run_bwa_se",
+                   "gcap/glue/eap_run_bwa_pe",
+                   "gcap/glue/dac_bam_se_post_filter",
+                   "gcap/glue/dac_bam_pe_post_filter",
+                  ],
+        package_data = {"gcap" : ["static/*"]},
+        install_requires=['jinja2','argparse'],
+        classifiers=[
+            'Development Status :: 4 - Beta',
+            'Environment :: Console',
+            'Intended Audience :: Developers',
+            'Intended Audience :: End Users/Desktop',
+            'License :: OSI Approved :: Python Software Foundation License',
+            'Operating System :: MacOS :: MacOS X',
+            'Operating System :: POSIX',
+            'Programming Language :: Python :: 3',
+            'Topic :: Software Development :: Libraries :: Python Modules'
         ],
-    )
+        )
+
+if __name__ == "__main__":
+    main()

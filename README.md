@@ -1,46 +1,39 @@
-## What is GCAP
+# What is GCAP
 > `G`lobal `C`hromatin `A`ccessibility `P`ipeline
 > 
 > X-nase(Dnase, Bnase, Cnase) Quality analysis pipeline
 > 
 ---
-### Prototype  Features
+## Prototype  Features
 
-1. estimate per sequence quality and library contamination by using 100k sampled reads(mapping by bowtie and bwa(not added yet))
-2. reads mapping(exclude mitochrondrial, X, Y mapping reads) and peaks calling on replicates all reads and 5M sampled reads(peak calling by hotspot and MACS2(added), sampling by Picard DownSampling by probability(5M/total_reads), which seems to be strange, sampling has been replaced by built-in python function, this is an option in conf file. set `picard sample path` would choose picard sampling, other situation would use built-in. Considering sampling from pair 1 for PE fastq or SE fastq files.
-3. For pair end data, 5' tags from each pair will be treated as single end for hotspot v3.
-4. peaks calling on combo of all reads and 5M sampled readss, Hotspot for 5M reads(broad Peak), Peaks for all reads(narrow Peak), that is, use `b, d`.
-5. estimate library complexity/redundancy by 5M reads(census;picard, Markduplicates; macs2 filterdup; awk)
-6. Add RSC / NSC to QC with SPOT score for 5M reads (Hotspot, a), optional: MACS2 spot score
-7. estimate replicates consistency by
-	1.a `wigCorrelate` for genome-wide correlation
-	1.b `bigWigCorrelate` for top 5M reads BigWiggle Correlation on union DHS regions(filtered by blacklist)
-	1.c BigWiggle Correlation on 5M sampled(top 5M) data union hotspot(Hotspot, b, which is filtered to remove blacklist and outlier regions) by bigwiggle(bigWigCorrelate, merged by bedops -m)
-    2. Overlap by hotspot(Hotspot, b) regions overlap from 5M reads(Intersection over Union regions, bedtools)
+See the google docs [specification](https://docs.google.com/document/d/1dEcH3ezfODrL4ffMeqKU4YLBALBB18k61HAmCj9KozE/edit).[^1]
 
-8. This has been removed, calculate hotspot(filtered Hotspot, b) promotor percentage and compare with genome promotor percentage for 5M reads Hotspot(b) regions(built-in script)
-9. calculate Phastcon score of top 1000 non-promotor Hotspot(filtered Hotspot, b)regions in 100 bp width around summits for 5M reads(modified cistrome built-in module)
-10. estimate (narrow peaks, d) overlap with ENCODE narrow peaks union DHS on replicates of 5M reads(bedtools)
-11. optionally, calculate cutting bias.
+[^1]: ENCODE version
 
 ---
 ### Installation
 
 > NOTE:
 
-	GCAP and samflow use python3
+	GCAP use python3
 
-First, install pipeline framework:
 
-	hg clone https://bitbucket.org/hanfeisun/samflow
-	python3 setup.py install
-	# or
-	pip-3.2 install samflow
+software    |version        | url |
+:-----------| :-----------: | :-------|
+python      | 3.3        | <https://www.python.org/ftp/python/3.3.3/Python-3.3.3.tgz> |
+bwa         | 0.7.7-master-r445        | <https://github.com/lh3/bwa> |
+fastqStatsAndSubsample | 2 | 	<https://github.com/ENCODE-DCC/kentUtils> |
+samtools | 0.1.19-44428cd | https://github.com/samtools/samtools|
 
-Then, install GCAP:
+Install `setuptools` before install GCAP.
+
+To avoid python version conflicts, users is recommended to use [virtualenv](https://raw.githubusercontent.com/pypa/virtualenv/1.9.X/virtualenv.py).
+
+
+Install GCAP:
 
     git clone https://github.com/qinqian/GCAP
-    python3 setup.py install
+    python setup.py install
 
 ---
 > The following component tools are all newest version.
@@ -337,8 +330,8 @@ python3 module `jinja2` is a template module for rendering latex document:
 
 
 	pip-3.2 install jinja2
-    # possible problem, use python >=3.3 with latest jinja2 version
-    # or use python3.2 with jinja 2.5
+        # possible problem, use python >=3.3 with latest jinja2 version
+        # or use python3.2 with jinja 2.5
 	# for options
 	pip-3.2 install argparse
 
@@ -571,11 +564,9 @@ Reference
 2. http://seqanswers.com/forums/showthread.php?t=16375
 3. http://picard.sourceforge.net/explain-flags.html
 
-
-----
-Example
-=========
-- An output from GCAP
+Outputs from GCAP
+==========================
+###QC metrics
 
 
-![QC report](example.png)
+###stored files

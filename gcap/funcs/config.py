@@ -1,18 +1,47 @@
 from configparser import ConfigParser, NoSectionError, NoOptionError
 import os
+import time
 
 
 class NoTreatmentData(Exception):
     pass
 
 class Conf(object):
-    def __init__(self, conf):
+    def __init__(self, conf, args):
         self._verbose_level = 1
         self._conf = ConfigParser()
+
         if not os.path.exists(conf):
             raise IOError("No such config file: %s" % repr(conf))
+
         self._conf.read(conf)
-        self.root_dir = os.path.dirname(conf)
+
+
+        self.threads = args.threads
+        self.pe = args.pe
+
+        self.input = args.input
+        self.target_dir = args.out
+        self.species = args.species
+        
+        self.id = args.name
+        
+        self._conf.set("basics", "time", time.strftime("%Y-%m-%d"))
+        self._conf.set("basics", "species", self.species)
+        self._conf.set("basics", "id", self.id)
+        self._conf.set("basics", "input", self.input)
+        self._conf.set("basics", "output", os.path.abspath(self.target_dir))
+
+        if args.species in ["hg19", "hg38"]:
+            self._conf.set("macs2", "species", "hs")
+        if args.species in ["mm9", "mm10"]:
+            self._conf.set("macs2", "species", "mm")
+
+        f = open('%s.conf'%(self.id), 'w')
+        self._conf.write(f)
+        self.root_dir = os.path.dirname('%s.conf'%(self.id))
+        f.close()
+
 
     def set_option(self, verbose_level=1):
         """
@@ -47,11 +76,37 @@ class Conf(object):
 
     @property
     def id(self):
-        return self.get("Basis", "id")
+        return self._id
+
+    @id.setter
+    def id(self,value):
+        self._id = value
+
+    @property
+    def threads(self):
+        return self._threads
+
+    @threads.setter
+    def threads(self, value):
+        self._threads = value
+
+    @property
+    def pe(self):
+        return self._pe
+
+    @pe.setter
+    def pe(self, value):
+        '''setting Pair End state, True for PE, False for SE
+        '''
+        self._pe = value
 
     @property
     def target_dir(self):
-        return self.get("Basis", "output")
+        return self._target_dir
+
+    @target_dir.setter
+    def target_dir(self, value):
+        self._target_dir = value
 
     @property
     def prefix(self):
@@ -110,46 +165,28 @@ class Conf(object):
         return [os.path.basename(i) for i in self.treatment_targets]
 
     @property
-    def treatment_bam(self):
-        """
-        inital input BAMs or SAMs, BEDs, separated by comma, no matter PE or SE
-        """
-        return [self.to_abs_path(i.strip()) for i in self.get("Basis", "treat").split(",")]
-
-    @property
-    def treatment_bed(self):
-        """
-        initial input reads BAMs, SAMs, BEDs, separated by comma, no matter PE or SE
-        """
-        return [self.to_abs_path(i.strip()) for i in self.get("Basis", "treat").split(",")]
-
-    @property
     def treatment_raws(self):
         """
         single end data separate by , for replicates
         pair end data separate by ; for replicates , for pairs
         """
-        if self.get("Basis", "treat").strip():
-            if self.seq_type == "se":
-                return [self.to_abs_path(i.strip()) for i in self.get("Basis", "treat").split(",")]
-            elif self.seq_type == "pe":
+        if self.get("basics", "input"):
+            if not self.pe:
+                return [self.to_abs_path(i.strip()) for i in self.get("basics", "input").split(",")]
+            else:
                 data_list = []
-                for i in self.get("Basis", "treat").split(";"):
+                for i in self.get("basics", "input").split(";"):
                     data_list.append([ self.to_abs_path(j.strip()) for j in i.split(",") ])
                 return data_list
-            elif self.seq_type.startswith("bam") or self.seq_type.startswith("sam") or self.seq_type.startswith("bed"):
-                return self.treatment_bam
         else:
             raise NoTreatmentData
 
     @property
     def treatment_targets(self):
-        if self.seq_type == "se":
+        if not self.pe:
             return self.treatment_single_targets
-        elif self.seq_type == "pe":
+        else:
             return self.treatment_pair_targets["reps"]
-        elif self.seq_type.startswith("bam") or self.seq_type.startswith("sam") or self.seq_type.startswith("bed"):
-            return self.treatment_single_targets
 
     @property
     def treatment_pair_data(self):
@@ -163,6 +200,11 @@ class Conf(object):
 
     @property
     def treatment_pair_targets(self):
+        '''pairs: for [[rep1_pair1, rep1_pair2]], 
+        usually for evaluating read quality
+        reps: for [rep1, rep2],
+        usually for mapping pair end data
+        '''
         return {"pairs": [ [os.path.join(self.target_dir, self.id + "_treat_rep" + str(num+1)) + "pair1",
                   os.path.join(self.target_dir, self.id + "_treat_rep" + str(num+1)) + "pair2"]
                  for num in range(len(self.treatment_raws)) ],
@@ -176,14 +218,7 @@ class Conf(object):
             os.makedirs(target_path)
         return target_path
 
-    @property
-    def maptool(self):
-        return self.get("tool", "mapping").strip().lower()
 
     @property
     def peakcalltool(self):
         return self.get("tool", "peak_calling").strip().lower()
-
-    @property
-    def seq_type(self):
-        return self.get("Basis", "sequence_type").strip().lower()

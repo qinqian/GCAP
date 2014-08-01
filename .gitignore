@@ -1,2 +1,10 @@
 .idea
+GCAP.egg-info/
+GCAP.iml
+build/
+dist/
+dependency/
 __pycache__
+uniformAnalysis/
+.py~
+*~

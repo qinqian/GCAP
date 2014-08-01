@@ -20,8 +20,8 @@ from pkg_resources import resource_filename
 from pkg_resources import resource_filename
 
 ## for hotspot conf file and pipeline shell scripts
-token_file = resource_filename("gcap", "static/runall.tokens.txt")
-pipeline_scripts = resource_filename("gcap", "pipeline-scripts")
+#token_file = resource_filename("gcap", "static/runall.tokens.txt")
+#pipeline_scripts = resource_filename("gcap", "pipeline-scripts")
 
 ## call peaks by hotspot or macs2 to QC DNase data
 def call_peaks(workflow, conf, tex):
@@ -424,7 +424,7 @@ def _macs2_on_reps(workflow, conf, tex):
         ## SPOT score for MACS2 5M reads
         attach_back(workflow, ShellCommand(
             "{tool} {input[starch]} {input[bed]}",
-            tool = "macs2_spot.sh",
+            tool = "dac_macs2_spot.sh",
             input = {"starch": target + suffix, "bed": target + "_5M_macs2_peaks.encodePeak"},
             output = target + "_5M_macs2_peaks.encodePeak" + ".spot.out"))
 
