@@ -1,0 +1,17 @@
+#!/bin/bash
+
+pbc() {
+    bamToBed -i $1 \
+         | awk '{l[$1"\t"$2"\t"$3"\t"$6]+=1} END {for(i in l) print l[i]}' - \
+         | awk '{n[$1]+=1} END {for (i in n) print i"\t"n[i]}'\
+         | sort -k1n -  > ${1}.hist
+    awk '{
+       if (NR==1) {N1=$2}
+       Nd+=$2
+       } END {print N1,Nd,N1/Nd}' ${1}.hist > ${1}.pbc
+}
+
+pbc $1
+
+
+

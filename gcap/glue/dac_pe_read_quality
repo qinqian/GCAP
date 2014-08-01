@@ -1,0 +1,15 @@
+#!/bin/bash -ex
+
+##  pair end DNase-seq data quality control
+
+pair1=$1
+pair2=$2
+qc1=$3
+qc2=$4
+
+fastqStatsAndSubsample -sampleSize=100000 $pair1 $qc1 100k.fq
+fastqStatsAndSubsample -sampleSize=100000 $pair2 $qc2 100k.fq
+
+rm 100k.fq
+
+

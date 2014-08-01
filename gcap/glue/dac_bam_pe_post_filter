@@ -1,0 +1,30 @@
+#!/bin/bash -ex
+
+## refer from ENCODE ChIP-seq pipeline and
+
+
+rawbam=$1
+namesortedbamprefix=$2
+namesortedbam=$3
+finalprefix=$4
+finalbam=$5
+finalindex=$6
+
+mapthresh=$5 ## we prefer 3
+bamwithoutchrm=$6
+qc=$7
+
+# remove unmapped/mate unmapped, not primary alignment, reads failing platform
+# remove low mapq reads
+# remove orphan reads ( pair was removed ) and read pairs mapping to different chromosomes
+# obtain sorted bam
+
+# ENCODE ChIP-seq filter standard
+
+samtools view -F 1804 -f 2 -q ${mapthresh} -u ${rawbam} | samtools sort -n - ${namesortedbamprefix}
+samtools fixmate -r ${namesortedbam} - | samtools view -F 1804 -f 2 -u | samtools sort - ${finalprefix}
+
+samtools flagstat ${finalbam} > ${qc}  ## peaks calling use ${finalbam}
+
+## utilize UCSC utility for filtering chrM sequences and sponge sequences
+edwBamFilter -sponge -chrom=chrM ${finalbam} ${bamwithoutchrm}  ## qc based on bam without chrm

@@ -1,0 +1,18 @@
+#!/bin/bash -ex
+# Run bash with -e exit on first error, -x add +command stream to sterr.
+# Remove -x for cleaner usage message
+
+threads=$1
+index=$2
+input=$3
+rawbam=$4
+qc=$5
+prefix=$6
+
+bwa aln -q 5 -l 32 -k 2 -t $threads $index $input > ${prefix}.sai
+bwa samse $index ${prefix}.sai ${input} | samtools view -Su - | samtools sort ${prefix}
+samtools flagstat ${rawbam} >${qc}
+
+rm ${prefix}.sai
+
+
