@@ -1,0 +1,22 @@
+#!/bin/bash -ex
+
+bamwithoutchrm=$1
+genome=$2
+readsize=$3
+spot=$4
+hotspot_dir=$5
+output=$6
+tmp=$7
+Nread2=5000000
+
+if [ ! -s ${bamwithoutchrm}.${Nread2}.bam ]
+then
+    edwBamStats -sampleBamSize=${Nread2} -u4mSize=${Nread2} -sampleBam=${bamwithoutchrm}.${Nread2}.bam ${bamwithoutchrm} tmp.ra
+fi
+
+if [ ! -d $output ]
+then
+    eap_run_hotspot $hotspot_dir $genome ${bamwithoutchrm}.${Nread2}.bam $readsize 5M.narrowPeak 5M.broadPeak 5M.bigWig $tmp $output
+    bigBedToBed 5M.broadPeak stdout | cut -f 1-4 > broad.bed
+    bigWigAverageOverBed 5M.bigWig broad.bed /dev/null -stats=${spot}
+fi
