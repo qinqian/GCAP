@@ -11,16 +11,31 @@
 #  $6 - where to put spot type output
 
 # Check command line and provide usage and version information
-if [ $# -ne 6 ];
-then echo "usage v1: eap_dnase_stats in.bam target readSize bamStats.ra sppStats.ra spotStats.ra"
+if [ $# -lt 6 ];
+then echo "usage v1: eap_dnase_stats in.bam spp_exec bamStats.ra sppStats.ra pe pbc"
 exit -1; fi
 
+bamwithoutchrm=$1
+run_spp=$2
+bamstat=$3
+spp=$4
+pe=$5
+pbc=$6
+
 ## sampling and evaluate bam
-edwBamStats -sampleBamSize=15000000 -u4mSize=15000000 -sampleBam=${subsampledbamwithoutchrm}
+Nread=15000000
 
-Rscript /hive/groups/encode/encode3/tools/phantompeakqualtools/run_spp.R -x=-500:-1 -s=-500:5:1500 -c=$1 -out=temp.tab
+if [ ! -s ${bamwithoutchrm}_${Nread}.bam ]
+then
+    edwBamStats -sampleBamSize=${Nread} -u4mSize=${Nread} -sampleBam=${bamwithoutchrm}_${Nread}.bam ${bamwithoutchrm} ${bamstat}
+fi
 
-eap_run_hotspot $2 5M.bam $3 5M.narrowPeak 5M.broadPeak 5M.bigWig
-bigBedToBed 5M.broadPeak stdout | cut -f 1-4 > broad.bed
-bigWigAverageOverBed 5M.bigWig broad.bed /dev/null -stats=spot.ra
-mv spot.ra $6
+if [ ! -s ${spp} ]
+then
+    Rscript ${run_spp} -x=-500:-1 -s=-500:5:1500 -out=${spp} -rf -c=${bamwithoutchrm}_${Nread}.bam
+fi
+
+if [ ! -s ${pbc} ]
+then
+    dac_pbc $pe ${bamwithoutchrm}_${Nread}.bam > ${pbc}
+fi

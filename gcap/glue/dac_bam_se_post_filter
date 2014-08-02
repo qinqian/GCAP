@@ -6,8 +6,9 @@ finalbam=$2
 mapthresh=$3 ## we prefer 1
 qc=$4
 bamwithoutchrm=$5
+finalprefix=$6
 
-samtools view -F 1804 -q ${mapthresh} -b ${rawbam} > ${finalbam}
+samtools view -F 1804 -q ${mapthresh} -u ${rawbam} | samtools sort - ${finalprefix}
 samtools flagstat ${finalbam} > ${qc}
 
 ## utilize UCSC utility for filtering chrM sequences and sponge sequences

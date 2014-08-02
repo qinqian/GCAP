@@ -1,17 +1,39 @@
 #!/bin/bash
 
-pbc() {
-    bamToBed -i $1 \
-         | awk '{l[$1"\t"$2"\t"$3"\t"$6]+=1} END {for(i in l) print l[i]}' - \
-         | awk '{n[$1]+=1} END {for (i in n) print i"\t"n[i]}'\
-         | sort -k1n -  > ${1}.hist
-    awk '{
-       if (NR==1) {N1=$2}
-       Nd+=$2
-       } END {print N1,Nd,N1/Nd}' ${1}.hist > ${1}.pbc
+type=$1
+bam=$2
+
+pbc_se() {
+    bedtools bamtobed -i ${1} \
+        | awk 'BEGIN{OFS="\t"}{print $1,$2,$3,$6}' \
+        | sort \
+        | uniq -c \
+        | awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'
+    # bamToBed -i $1 \
+    #      | awk '{l[$1"\t"$2"\t"$3"\t"$6]+=1} END {for(i in l) print l[i]}' - \
+    #      | awk '{n[$1]+=1} END {for (i in n) print i"\t"n[i]}'\
+    #      | sort -k1n -  > ${1}.hist
+    # awk '{
+    #    if (NR==1) {N1=$2}
+    #    Nd+=$2
+    #    } END {print N1,Nd,N1/Nd}' ${1}.hist
 }
 
-pbc $1
+pbc_pe() {
+    ## m0 distinct reads; m1 location with exactly one read;
+    ## m2 location with exactly 2 read; mt total reads
+    # samtools sort -n $1 | \
+        # bamToBed -bedpe -i stdin \
+        bamToBed -bedpe -i $1 \
+        | awk 'BEGIN{OFS="\t"} {print $1,$2,$4,$6,$9,$10}' \
+        | sort \
+        | uniq -c \
+        | awk 'BEGIN{mt=0;m0=0;m1=0;m2=0} ($1==1){m1=m1+1} ($1==2){m2=m2+1} {m0=m0+1} {mt=mt+$1} END{printf "%d\t%d\t%d\t%d\t%f\t%f\t%f\n",mt,m0,m1,m2,m0/mt,m1/m0,m1/m2}'
+}
 
-
-
+if [ $type == "pe" ]
+then
+    pbc_pe $bam
+else
+    pbc_se $bam
+fi

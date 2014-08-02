@@ -18,6 +18,7 @@ class Conf(object):
 
 
         self.threads = args.threads
+        self.readsize = args.readsize
         self.pe = args.pe
 
         self.input = args.input
@@ -31,11 +32,6 @@ class Conf(object):
         self._conf.set("basics", "id", self.id)
         self._conf.set("basics", "input", self.input)
         self._conf.set("basics", "output", os.path.abspath(self.target_dir))
-
-        if args.species in ["hg19", "hg38"]:
-            self._conf.set("macs2", "species", "hs")
-        if args.species in ["mm9", "mm10"]:
-            self._conf.set("macs2", "species", "mm")
 
         f = open('%s.conf'%(self.id), 'w')
         self._conf.write(f)

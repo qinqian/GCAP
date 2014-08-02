@@ -14,30 +14,28 @@ def _bwa(workflow, conf):
     """
     incorpate ENCODE ChIP-seq alignment parameters
     """
-    if conf.pe:
-        for raw, target in conf.treatment_pairs_pe:
+    for raw, target in conf.treatment_pairs:
+        param = {"threads": 8,
+                 "index":conf.get(conf.species, "genome_index"),
+                 "prefix": target + "_raw_sorted"}
+
+        if conf.pe:
             bwa = attach_back(workflow, ShellCommand(
                 "{tool} {param[threads]} {param[index]} {input[fastq][0]} {input[fastq][1]} {output[bam]} {output[qc]} {param[prefix]}",
                 tool = "eap_run_bwa_pe",
                 input = {"fastq": raw},
                 output = {"bam": target + "_raw_sorted.bam", "qc": target + "_rawbam.qc"},
-                param = {"threads": 8,
-                         "index":conf.get(conf.species, "genome_index"),
-                         "prefix": target + "_raw_sorted"},
+                param = param,
                 name = "pair end mapping"))
-
-    else:
-        for raw, target in conf.treatment_pairs:
+        else:
             bwa = attach_back(workflow, ShellCommand(
                 "{tool} {param[threads]} {param[index]} {input[fastq]} {output[bam]} {output[qc]} {param[prefix]}",
                 tool = "eap_run_bwa_se",
                 input = {"fastq": raw},
                 output = {"bam": target + "_raw_sorted.bam", "qc": target + "_rawbam.qc"},
-                param = {"threads": 8,
-                         "prefix": target + "_raw_sorted",
-                         "index":conf.get(conf.species, "genome_index")},
+                param = param,
                 name = "single end mapping"))
-    bwa.update(param = conf.items("bwa"))
+        bwa.update(param = conf.items("bwa"))
 
 
 ## reads mapping by customized mapping tool, calculate autosome(exclude M, X, Y) mapping ratio as we discussed before

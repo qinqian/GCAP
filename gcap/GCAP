@@ -11,14 +11,12 @@ from samflow.command import ShellCommand
 from gcap.funcs.config import Conf
 from gcap.funcs.sequence_quality import read_quality
 from gcap.funcs.mapping import read_mapping
-from gcap.funcs.filter_sample import filter_bam
+from gcap.funcs.filter import filter_bam
+from gcap.funcs.dnase_stat import sample_bam_stat
+from gcap.funcs.peaks_calling import call_peaks
 
 # from gcap.funcs.fragment import fragment_size
-# from gcap.funcs.library_complexity import library_complexity
-# from gcap.funcs.nsc_rsc import strand_cor
-# from gcap.funcs.peaks_calling import call_peaks
 # from gcap.funcs.union_dhs_overlap import union_DHS_overlap
-# from gcap.funcs.pdf_report import report
 
 from configparser import SafeConfigParser
 from pkg_resources import resource_filename
@@ -42,7 +40,7 @@ def parse_args(args=None):
     parser.add_argument("--dry-run", dest="dry_run", action="store_true", default=False)
     parser.add_argument("--resume", dest="resume", action="store_false", default=True)
     parser.add_argument("--pe", dest="pe", action="store_true", default=False)
-    parser.add_argument("--threads", dest="threads", default=4, type=int,
+    parser.add_argument("--threads", dest="threads", default=8, type=int,
                         help="threads # to use when aligning (default: 4)")
     parser.add_argument("-i", "--input", dest = "input", required=True,
                         help = "DNase-seq data, comma(,) separate replicates, format(fastq) fixed by extension")
@@ -54,6 +52,9 @@ def parse_args(args=None):
 
     parser.add_argument("-s", "--species", dest = "species", 
                         help="species set by gcap.conf: %s" % ' '.join(species_ls))
+    parser.add_argument("-r", "--readsize", dest = "readsize", default=36,
+                        help="species set by gcap.conf: %s" % ' '.join(species_ls))
+
     parser.add_argument("-o", "--output", dest = "out", 
                         help="output directory", default="output")
     parser.add_argument("-n", "--name", dest = "name", 
@@ -125,23 +126,15 @@ def create_workflow(args, conf, tex):
     if need_run(3):
         bld.build(filter_bam)
 
-    # if need_run(3):
-    #      bld.build(library_complexity)
+    if need_run(4):
+        bld.build(sample_bam_stat)
 
-    # if need_run(4):
-    #     bld.build(strand_cor)
-
+    if need_run(5):
+        bld.build(call_peaks)
     # if need_run(6):
+    #     bld.build(pool) ## pool peak calling and dhs overlap
+    # if need_run(6): # optionally
     #     bld.build(fragment_size)
-
-    # if need_run(7):
-    #     bld.build(call_peaks)
-
-    # if need_run(8):
-    #     bld.build(union_DHS_overlap)
-
-    # if need_run(9):
-    #     bld.build(report)
     return workflow
 
 def main(args=None):

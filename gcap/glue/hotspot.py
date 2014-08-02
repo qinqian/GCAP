@@ -4,11 +4,11 @@ import sys, os, argparse, subprocess, json
 
 def main():
     readLengths = ['32', '36', '40', '50', '58', '72', '76', '100']
-    genomes = ['hg19', 'mm9']
+    genomes = ['hg19', 'mm9', 'mm10'] ## hg38 not available yet for hotspot v4
     dataTypes = ['DNase-seq', 'ChIP-seq']
 
     parser = argparse.ArgumentParser(description = 'Hotspot wrapper for Uniform Analysis Pipeline. Version 3')
-    parser.add_argument('hotspotLocation', help='The directory to the hotspot installation, for instance "/hive/groups/encode/encode3/tools/hotspot-distr-v4/"')
+    parser.add_argument('hotspotLocation', help='The directory to the hotspot installation, for instance "/tools/hotspot/dir"')
     parser.add_argument('inputBam', help='Alignment file (in BAM format) to run hotspot on')
     parser.add_argument('genome', help='Which genome to use, the following are supported: ' + ','.join(genomes))
     parser.add_argument('dataType', help='Which datatype to use, the following are supported: ' + ','.join(dataTypes))
@@ -16,14 +16,15 @@ def main():
     parser.add_argument('tmpDir', help='Path to a temporary directory that will be created by this tool and cleaned up afterwards')
     parser.add_argument('outputDir', help='Path to a directory to which the output files will be copied')
     parser.add_argument('-s', '--seed', type=int, default=101)
+    parser.add_argument('-o', '--onlyspot', type=int, default=False)
     parser.add_argument('-i', '--inputControl', default=None, help='Bam file, For ChIP-seq runs, an input will be required')
     parser.add_argument('-c', '--checkChr', default=None, help='Tests a portion of the given chromosome (e.g. chrX)')
-    
+
     if len(sys.argv) < 2:
-        parser.print_usage() 
+        parser.print_usage()
         return
     args = parser.parse_args(sys.argv[1:])
-    
+
     # ensure all inputs are valid directories/files/arguments
     if not os.path.isdir(args.hotspotLocation):
         raise ValueError('hotspotLocation: %s is not a valid directory' % args.hotspotLocation)
@@ -33,12 +34,12 @@ def main():
         raise ValueError('genome: ' + args.genome + ' is not a valid genome, must be one of: ' + ','.join(genomes))
     if args.readLength not in readLengths:
         raise ValueError('readLength: ' + args.readLength + ' is not a supported read length, must be one of: ' + ','.join(readLengths))
-      
+
     # checking dataType constraints
     if args.dataType.lower() == 'dnase-seq':
         if args.inputControl != None:
             raise ValueError('DNase-seq does not support input controls')
-    elif args.dataType.lower() == 'chip-seq':   
+    elif args.dataType.lower() == 'chip-seq':
         if args.inputControl == None:
             raise ValueError('ChIP-seq requires an input control')
         if not os.path.isfile(args.inputControl):
@@ -69,7 +70,7 @@ def main():
     peakFindExe = args.hotspotLocation + 'hotspot-deploy/bin/wavePeaks'
     tokenizerExe = args.hotspotLocation + 'ScriptTokenizer/src/script-tokenizer.py'
     pipeDir = args.hotspotLocation + 'pipeline-scripts'
-    
+
     # ensure all hotspot files are in the right location
     for f in chromInfoBed, mappableFile, omitRegionsFile, hotspotExe, peakFindExe, tokenizerExe, pipeDir:
         if not os.path.exists(f):
@@ -161,27 +162,24 @@ def main():
         runhotspot.write('    $pipeDir/run_pass1_merge_and_thresh_hotspots\n')
         runhotspot.write('    $pipeDir/run_pass2_hotspot\n')
         runhotspot.write('    $pipeDir/run_rescore_hotspot_passes\n')
+
         runhotspot.write('    $pipeDir/run_spot\n')
-        runhotspot.write('    $pipeDir/run_thresh_hot.R\n')
-        runhotspot.write('    $pipeDir/run_both-passes_merge_and_thresh_hotspots\n')
-        runhotspot.write('    $pipeDir/run_add_peaks_per_hotspot\n')
-        runhotspot.write('    $pipeDir/run_final"\n')
-        runhotspot.write('$scriptTokBin --clobber --output-dir=%s $tokenFile $scripts\n' % args.tmpDir)
+        if not args.onlyspot: ## only computing SPOT score, do not call narrowpeak
+            runhotspot.write('    $pipeDir/run_thresh_hot.R\n')
+            runhotspot.write('    $pipeDir/run_both-passes_merge_and_thresh_hotspots\n')
+            runhotspot.write('    $pipeDir/run_add_peaks_per_hotspot\n')
+            runhotspot.write('    $pipeDir/run_final"\n')
+            
+        runhotspot.write('python2.7 $scriptTokBin --clobber --output-dir=%s $tokenFile $scripts\n' % args.tmpDir)
         runhotspot.write('cd %s\n' % args.tmpDir)
         runhotspot.write('retCode=0\n')
         runhotspot.write('for script in $scripts\n')
         runhotspot.write('do\n')
-        runhotspot.write('    time %s$(basename $script).tok\n' % args.tmpDir)
+        runhotspot.write('    time bash  %s$(basename $script).tok\n' % args.tmpDir)
         runhotspot.write('    retCode=$?\n')
         runhotspot.write('done\n')
         runhotspot.write('exit $retCode\n')
 
-    '''
-    if [ $spot == "5M" ]
-    then
-    bash ./run_spot.tok
-    fi
-    '''
     os.chmod(runhotspotName, 0o755) # Make this executable (leading 0 is for octal)
     
     retCode = subprocess.call(runhotspotName)

@@ -10,7 +10,7 @@ qc=$5
 prefix=$6
 
 bwa aln -q 5 -l 32 -k 2 -t $threads $index $input > ${prefix}.sai
-bwa samse $index ${prefix}.sai ${input} | samtools view -Su - | samtools sort ${prefix}
+bwa samse $index ${prefix}.sai ${input} | samtools view -Shu - | samtools sort - ${prefix}
 samtools flagstat ${rawbam} >${qc}
 
 rm ${prefix}.sai

@@ -23,7 +23,6 @@ def filter_bam(workflow, conf, tex):
                      "finalprefix": target + "_final"}
             output = {"finalbam": target + "_final.bam",
                       "namesortedbam": target + "_name_sorted.bam",
-                      "finalindex": target + "_final.bam.bai",
                       "bamwithoutchrm": target + "_final_nochrm.bam",
                       "qc": target + "_filter_bam.qc"}
 
@@ -49,7 +48,3 @@ def filter_bam(workflow, conf, tex):
                 output=output,
                 param=param,
                 name="%s end filtering" % name))
-
-
-def sample_evaluate():
-    return

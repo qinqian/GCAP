@@ -12,12 +12,12 @@ rawbam=$5
 qc=$6
 prefix=$7
 
-bwa aln -q 5 -l 32 -k 2 -t $threads $index $pair1 > ${pair1}.sai
-bwa aln -q 5 -l 32 -k 2 -t $threads $index $pair2 > ${pair2}.sai
+bwa aln -q 5 -l 32 -k 2 -t $threads $index $pair1 > ${prefix}_1.sai
+bwa aln -q 5 -l 32 -k 2 -t $threads $index $pair2 > ${prefix}_2.sai
 
-bwa sampe $index ${pair1}.sai ${pair2}.sai ${pair1} ${pair2} | samtools view -Shu | samtools sort - ${prefix}
+bwa sampe $index ${prefix}_1.sai ${prefix}_2.sai ${pair1} ${pair2} | samtools view -Shu - | samtools sort - ${prefix}
 samtools flagstat ${rawbam} >${qc}
 
-rm ${pair1}.sai ${pair2}.sai
+rm ${prefix}_1.sai ${prefix}_2.sai
 
 
