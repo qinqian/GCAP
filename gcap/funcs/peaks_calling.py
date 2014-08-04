@@ -11,50 +11,94 @@ from samflow.command import ShellCommand, PythonCommand
 from samflow.workflow import attach_back
 from gcap.funcs.helpers import *
 from pkg_resources import resource_filename
-## from gcap.funcs.reps_quality import peaks_reps_preprocess, peaks_reps_evaluating
 
 ## call peaks by hotspot or macs2 to QC DNase data
 def call_peaks(workflow, conf, tex):
-    have_treat_reps = len(conf.treatment_pairs) >= 2 ## replicates
-    if conf.peakcalltool == "hotspot":
-        _hotspot_on_replicates(workflow, conf, tex)
-    elif conf.peakcalltool == "macs2":
-        _macs2_on_reps(workflow, conf, tex)
-    if have_treat_reps:
+
+    if 'hotspot' in conf.get("tool", "peak_calling"):
+        hotspotv4(workflow, conf, tex)
+        # if conf.peakcalltool == "hotspot":
+
+        # elif conf.peakcalltool == "macs2":
+        #     _macs2_on_reps(workflow, conf, tex)
         ## evaluate replicates consistency
         # peaks_reps_evaluating(workflow, conf, tex)
         ## peaks calling on merged reads files
-        if conf.peakcalltool == "hotspot":
-            _hotspot_combo(workflow, conf)
-        elif conf.peakcalltool == "macs2":
-            _macs2_on_combo(workflow, conf)
+        # if conf.peakcalltool == "hotspot":
+        #     _hotspot_combo(workflow, conf)
+        # elif conf.peakcalltool == "macs2":
+        #     _macs2_on_combo(workflow, conf)
 
-# ## convert json files to latex report
-# def spot_doc(input = {"tex": "", "json": ""}, output = {"latex": ""}, param = {"samples": "", "reps": ""}):
-#     data = json_load(input["json"])["stat"]
-#     spot = []
-#     for s in param["samples"]:
-#         spot.append(decimal_to_latex_percent(data[s]["spot"]))
+def eval_reps(workflow, conf, tex):
 
-#     spot_latex = JinjaTemplateCommand(
-#         template = input["tex"],
-#         name = "peaks_calling",
-#         param = {"section_name": "spot",
-#                  "render_dump": output["latex"],
-#                  "spot": spot,
-#                  "reps": param["reps"]})
+    attach_back(workflow, ShellCommand(
+        """
+        cat {param[narrowPeaks]} | sort -k1,1 -k2,2n - | bedtools merge -i - > {output[mergedPeak]}
+        bedToBigBed {output[mergedPeak]} {param[chromsize]} {output[mergedPeakbb]}
+        bigWigCorrelate -restrict={output[mergedPeakbb]} {param[bigwigs]} 1>{output[qc1]}
+        {tool} {param[narrowPeaksbb]} {output[qc2]}
+        """,
+        tool = "edwComparePeaks",
+        input = {"narrowPeaks": [ target + ".narrowPeak" for target in conf.treatment_targets ],
+                 "bigwigs": [ target + ".bigWig" for target in conf.treatment_targets ],
+                 "narrowPeakbbs": [ target + ".narrowPeak.bigBed" for target in conf.treatment_targets ]},
+        output = {"mergedPeak": conf.prefix + "_merge.bed",
+                  "mergedPeakbb": conf.prefix + "_merged.bigBed",
+                  "qc1": conf.prefix + "_cor.qc",
+                  "qc2": conf.prefix + "_overlap.qc"},
+        param = {"narrowPeaksbb": " ".join([ target + ".narrowPeak.bigBed" for target in conf.treatment_targets ]),
+                 "narrowPeaks": " ".join([ target + ".narrowPeak" for target in conf.treatment_targets ]),
+                 "bigwigs": " ".join([ target + ".bigWig" for target in conf.treatment_targets ]),
+                 "chromsize": conf.get(conf.species, "chrom_len")}))
 
-#     template_dump(spot_latex)
+
+def hotspotv4(workflow, conf, tex):
+    for target in conf.treatment_targets:
+        narrow = resource_filename("gcap", "glue/narrowPeak.as")
+        broad = resource_filename("gcap", "glue/broadPeak.as")
+        hotspot=attach_back(workflow,
+                    ShellCommand(
+                        "{tool} {param[hotspot_dir]} {param[genome]} {input[bam]} {param[readsize]} {output[narrowbb]} {output[broadbb]} {output[bigwig]} {param[tmp]} {output[hotspot_output]} {input[narrowas]} {input[broadas]} {param[chromsize]} {output[narrow]} {output[broad]}",
+                        tool = "eap_run_hotspot",
+                        input = {"bam": target + "_final_nochrm.bam",
+                                 "narrowas": narrow,
+                                 "broadas": broad},
+                        output = {"narrowbb": target + ".narrowPeak.bigBed",
+                                  "broadbb": target + ".broadPeak.bigBed",
+                                  "narrow": target + ".narrowPeak",
+                                  "broad": target + ".broadPeak",
+                                  "bigwig": target + ".bigWig",
+                                  "hotspot_output": target + "_hotspot"},
+                        param = {"hotspot_dir": conf.get("tool", "peak_calling"),
+                                 "genome": conf.species,
+                                 "chromsize": conf.get(conf.species, "chrom_len"),
+                                 "tmp": target + "_hotspot_peak_call_tmp",
+                                 "readsize": 36}))
+    have_treat_reps = len(conf.treatment_pairs) >= 2 ## replicates
+
+    if have_treat_reps:
+        eval_reps(workflow, conf, tex)
+        catsam = attach_back(workflow, ShellCommand(
+            "{tool} cat {param[bams]} > {output[bam]}",
+            tool = "samtools",
+            input ={"bams": [ target + "_final.bam" for target in conf.treatment_targets]},
+            output = {"bam": conf.prefix + "_pool.bam"}))
+        catsam.param.update(bams=' '.join(catsam.input["bams"]))
+        hotspot_merge = hotspot.clone
+        hotspot_merge.param.update(tmp=conf.prefix+"_hotspot_peak_call_tmp")
+        hotspot_merge.input.update(bam = conf.prefix + "_pool.bam")
+        hotspot_merge.output ={"narrowbb": conf.prefix + ".narrowPeak.bigBed",
+                               "broadbb": conf.prefix + ".broadPeak.bigBed",
+                               "narrow": conf.prefix + ".narrowPeak",
+                               "broad": conf.prefix + ".broadPeak",
+                               "bigwig": conf.prefix + ".bigWig",
+                               "hotspot_output": conf.prefix + "_hotspot"}
+        attach_back(workflow, hotspot_merge)
 
 # ## default hotspot peaks calling for all reads and 5M reads replicates files
 # ## SPOT score to json and latex on 5M reads for 2 replicates data
 # def _hotspot_on_replicates(workflow, conf, tex):
 #     """
-#     Use hotspot v4, output list:
-# 	*-final/*.hot.bed               minimally thresholded hotspots( corresponding to hotspot v3 b, broad Peak)
-# 	*-final/*.fdr0.01.hot.bed       FDR thresholded hotspots  ( corresponding to hotspot v3 c)
-# 	*-final/*.fdr0.01.pks.bed       FDR thresholded peaks     ( corresponding to hotspot v3 d, narrow Peak)
-# 	tag.density.starch              in target directory, 20bp resolution, converted to bigwiggle
 #     """
 #     if conf.seq_type.startswith("bed"):
 #         kind = ".bed.starch"
@@ -81,120 +125,6 @@ def call_peaks(workflow, conf, tex):
 #                          "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}, ## mouse do not run_badspot
 #                 name = "hotspot config"))
 #         hotspot_conf.param.update(conf.items("hotspot"))
-
-#         ## run hotspot v4
-#         attach_back(workflow, ShellCommand(
-#             "{tool} {input[pipe]} {input[token]} {output[dir]} {param[spot]} {param[omit]}",
-#             tool = "runhotspot",
-#             input = {"pipe": pipeline_scripts, "token": target + "_runall.tokens.txt"},
-#             output = {"dir": conf.target_dir,
-#                       "hotspot": conf.hotspot_reps_final_prefix[i] + ".hot.bed",
-#                       "density_starch": target + ".tagdensity.bed.starch",
-#                       "peaks": conf.hotspot_reps_final_prefix[i] + ".fdr0.01.pks.bed"},
-#             param = {"spot": "all",
-#                      "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}))
-
-#         ## hotspot all reads bigwiggle
-#         attach_back(workflow, ShellCommand(
-#             "{tool} {input[starch]} > {output[bed]}",
-#             tool = "unstarch",
-#             input = {"starch": target + ".tagdensity.bed.starch"},
-#             output = {"bed": target + ".tagdensity.bed.tmp"}))
-#         attach_back(workflow,
-#             ShellCommand(
-#                 '{tool} intersect -a {input} -b {param[chrom_bed]} -f 1.00 > {output}',
-#                 tool="bedtools",
-#                 input=target + ".tagdensity.bed.tmp",
-#                 output=target + ".tagdensity.bed",
-#                 param={'chrom_bed': conf.get("lib", "chrom_bed")},
-#                 name="bed replicate filtering"))
-
-#         ## convert to bigwiggle, 20 bp resolution
-#         attach_back(workflow,
-#             ShellCommand(
-#                 'cut -f 1,2,3,5 {input} > {input}.tmp && {tool} {input}.tmp {param[chrom_len]} {output}',
-#                 tool = "bedGraphToBigWig",
-#                 input=target + ".tagdensity.bed",
-#                 output=target + "_density.bw",
-#                 param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
-
-#     ## Use 5M reads to estimate SPOT
-#     for i, target in enumerate(conf.treatment_targets):
-#         ## prepare input for hotspot, get mappable tags and starch into output directory
-#         if conf.seq_type.startswith("bed"):  ## get library complexity
-#             attach_back(workflow,
-#                 ShellCommand(
-#                     "{tool} {input} {output[starch]} {param[tool]} {output[redundancy]}",
-#                     tool = "bed_duplicates.sh",
-#                     input = target + "_5M.bed",
-#                     output = {"starch": conf.hotspot_starch_input[i] + suffix,
-#                               "redundancy": target + ".dup_metrics"},
-#                     param = {"tool": conf.peakcalltool}))
-
-#         ## generate configuration for hotspot v4
-#         hotspot_conf = attach_back(workflow,
-#             PythonCommand(spot_conf,
-#                 input = {"spot_conf": token_file,
-#                          "tag": conf.hotspot_starch_input[i] + suffix if conf.seq_type.startswith("bed") else target + suffix, ## for bed.starch input files, should be in a different output directory
-#                          "mappable_region": conf.get("hotspot", "mappable_region"),
-#                          "chrom_info": conf.get("hotspot", "chrom_info")},
-#                 output = {"conf": target + "_runall_5M.tokens.txt",
-#                           "dir": conf.target_dir},
-#                 param = {"fdrs": "0.01", "K": conf.get("Basis", "read_length"),
-#                          "species": conf.get("Basis", "species"),
-#                          "keep_dup": "T"}))
-#         hotspot_conf.param.update(conf.items("hotspot"))
-#         ## run hotspot v4
-#         hotspot_run = attach_back(workflow, ShellCommand(
-#             "{tool} {input[pipe]} {input[token]} {output[dir]} {param[spot]} {param[omit]}",
-#             tool = "runhotspot",
-#             input = {"pipe": pipeline_scripts, "token": target + "_runall_5M.tokens.txt"},
-#             output = {"dir": conf.target_dir,
-#                       "spot_peaks_combined": conf.hotspot_reps_final_5M_prefix[i] + ".fdr0.01.pks.bed",
-#                       "density_starch": target + "_5M_sort.tagdensity.bed.starch",
-#                       "hotspot":  conf.hotspot_reps_final_5M_prefix[i] + ".hot.bed",
-#                       "spot": target + "_5M_sort.spot.out"},
-#             param = {"spot": "5M",
-#                      "omit": resource_filename("gcap", "static/Satellite.hg19.bed") if conf.get("Basis", "species") == "hg19" else ""}))
-
-#         ## 5M reads density from hotspot v4 tag density, 20bp resolution
-#         ## for correlation evaluation
-#         attach_back(workflow, ShellCommand(
-#             "{tool} {input[starch]} > {output[bed]}",
-#             tool = "unstarch",
-#             input = {"starch": target + "_5M_sort.tagdensity.bed.starch"},
-#             output = {"bed": target + "_5M.tagdensity.bed.tmp"}))
-#         ## For bedGraphToBigwiggle bugs, we need to remove coordinates outlier
-#         ## filter bdg file to remove over-border coordinates
-#         ## use 5M bigwiggle to estimate replicates consistency
-#         attach_back(workflow,
-#             ShellCommand(
-#                 '{tool} intersect -wa -a {input} -b {param[chrom_bed]} -f 1.00 > {output}',
-#                 tool="bedtools",
-#                 input=target + "_5M.tagdensity.bed.tmp",
-#                 output=target + "_5M.tagdensity.bed",
-#                 param={'chrom_bed': conf.get("lib", "chrom_bed")},
-#                 name="bed replicate filtering"))
-#         ## convert to bigwiggle
-#         attach_back(workflow,
-#             ShellCommand(
-#                 'cut -f 1,2,3,5 {input} > {input}.final && {tool} {input}.final {param[chrom_len]} {output}',
-#                 tool = "bedGraphToBigWig",
-#                 input=target + "_5M.tagdensity.bed",
-#                 output=target + "_5M.bw",
-#                 param={"chrom_len": conf.get("lib", "chrom_len")}, name="bdg_to_bw"))
-
-#     ## depend on bed_duplicates.sh, calculate redundancy using awk
-#     if conf.seq_type.startswith("bed"):
-#         attach_back(workflow, PythonCommand(
-#             stat_redun_census,
-#             input = {"redundancy": [ target + ".dup_metrics" for target in conf.treatment_targets ]},
-#             output = {"json": conf.json_prefix + "_redun.json"}, param = {"samples": conf.treatment_bases, "format": conf.seq_type}))
-#         attach_back(workflow, PythonCommand(
-#             redundancy_doc,
-#             input = {"tex": tex, "json": conf.json_prefix + "_redun.json"},
-#             output = {"redun": conf.latex_prefix + "redun.tex"},
-#             param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases}))
 
 # ## call peaks on merged reads files by hotspot
 # def _hotspot_combo(workflow, conf):
@@ -401,145 +331,3 @@ def call_peaks(workflow, conf, tex):
 #             output = {"redun": conf.latex_prefix + "redun.tex"},
 #             param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases}))
 
-# ## call peaks by macs2 on merged reads files
-# def _macs2_on_combo(workflow, conf):
-#     # merge all treatments into one
-#     if not conf.seq_type.startswith("bed"):
-#         merge_bams_treat = ShellCommand(
-#             "{tool} merge {output[merged]} {param[bams]}",
-#             tool="samtools",
-#             input=[ target + ".bam" for target in conf.treatment_targets],
-#             output={"merged": conf.prefix + "_treatment.bam"})
-#         merge_bams_treat.param = {"bams": " ".join(merge_bams_treat.input)}
-#         attach_back(workflow, merge_bams_treat)
-#         kind = "_treatment.bam"
-#     else:
-#         merge_beds_treat = ShellCommand(
-#             "{tool} {param[bed]} > {output[bed]}",
-#             tool = "cat",
-#             input = [ target + ".bed.all" for target in conf.treatment_targets ],
-#             output = {"bed": conf.prefix + "_treatment.bed"})
-#         merge_beds_treat.param = {"bed": " ".join(merge_beds_treat.input)}
-#         attach_back(workflow, merge_beds_treat)
-#         kind = "_treatment.bed"
-#     macs2_on_merged = attach_back(workflow, ShellCommand(
-#         "{tool} callpeak -B -q {param[fdr]} -f {param[format]} --keep-dup {param[keep_dup]} --shiftsize={param[shiftsize]} --nomodel -g {param[species]} \
-#         {param[treat_opt]} -n {param[description]}",
-#         tool="macs2",
-#         input={"merged": conf.prefix + kind},
-#         output={"peaks": conf.prefix + "_peaks.encodePeak",
-#                 "summit": conf.prefix + "_summits.bed",
-#                 "treat_bdg": conf.prefix + "_treat_pileup.bdg",
-#                 "peaks_xls": conf.prefix + "_peaks.xls",
-#                 "control_bdg": conf.prefix + "_control_lambda.bdg"},
-#         param={"description": conf.prefix,
-#                "keep_dup": "all",
-#                "shiftsize": 50,
-#                "fdr": 0.01,
-#                "species": conf.get("macs2",  "species")},
-#         name="macs2_callpeak_merged"))
-
-#     macs2_on_merged.param["treat_opt"] = " -t " + macs2_on_merged.input["merged"]
-#     macs2_on_merged.update(param=conf.items("macs2"))
-
-#     if conf.seq_type == "se":
-#         macs2_on_merged.param["format"] = "BAM"
-#     elif conf.seq_type == "pe":
-#         macs2_on_merged.param["format"] = "BAMPE"   ## pair end mode, not compatible with SAM files built-in sampling
-#     elif conf.seq_type.startswith("bam") or conf.seq_type.startswith("sam"):
-#         if conf.seq_type.split(",")[1].strip().lower() == "se":
-#             macs2_on_merged.param["format"] = "BAM"
-#         elif conf.seq_type.split(",")[1].strip().lower() == "pe":
-#             macs2_on_merged.param["format"] = "BAMPE"
-#     elif conf.seq_type.startswith("bed"):
-#         macs2_on_merged.param["format"] = "BED"
-
-#     ## BedClip
-#     ## prototype used here to do the similar thing on bedclip
-#     bed_clip = attach_back(workflow,
-#         ShellCommand(
-#             template="{tool} {input} {param[chrom_len]} {output}",
-#             tool="bedClip",
-#             input=conf.prefix + "_treat_pileup.bdg",
-#             output =conf.prefix + "_treat_pileup.bdg.tmp",
-#             param={'chrom_len': conf.get_path("lib", "chrom_len")},
-#             name="bedclip filter"))
-
-#     bdg2bw_treat = attach_back(workflow,
-#         ShellCommand(
-#             "{tool} {input[bdg]} {input[chrom_len]} {output[bw]}",
-#             tool="bedGraphToBigWig",
-#             input={"bdg": conf.prefix + "_treat_pileup.bdg.tmp",
-#                    "chrom_len": conf.get("lib", "chrom_len")},
-#             output={"bw": conf.prefix + "_macs2_treat_all.bw"},
-#             name="bdg_to_bw"))
-
-# def _peaks_calling_latex(workflow, conf, tex):
-#     ## peaks number json
-#     if conf.peakcalltool == "hotspot":
-#         if len(conf.treatment_pairs) >= 2:
-#             ## use hotspot b to evaluate 5M reads peaks number, replicates consistency
-#             ## use peaks d as narrow peaks to evaluate all reads peaks number
-#             attach_back(workflow, PythonCommand(
-#                 stat_peaks,
-#                 input = {"peaks": {"5M_spot": [ conf.hotspot_reps_final_5M_prefix[i] + ".hot.bed" for i in range(len(conf.treatment_pairs)) ],
-#                                    "all_peaks": [ conf.hotspot_reps_final_prefix[i] + ".fdr0.01.pks.bed" for i in range(len(conf.treatment_pairs)) ],
-#                                    "combo": conf.hotspot_merge_final_prefix + "_merge_all.fdr0.01.pks.bed" }},
-#                 output = {"json": conf.json_prefix + "_peaks.json"},
-#                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases},
-#                 name = "json peaks and hotspot"))
-#         else:
-#             attach_back(workflow, PythonCommand(
-#                 stat_peaks,
-#                 input = {"peaks": {"5M_spot": [ conf.hotspot_reps_final_5M_prefix[i] + ".hot.bed" for i in range(len(conf.treatment_pairs)) ],
-#                                    "all_peaks": [ conf.hotspot_reps_final_prefix[i] + ".fdr0.01.pks.bed" for i in range(len(conf.treatment_pairs)) ]}},
-#                 output = {"json": conf.json_prefix + "_peaks.json"},
-#                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases},
-#                 name = "json peaks and hotspot"))
-
-#     elif conf.peakcalltool == "macs2":
-#         if len(conf.treatment_pairs) >= 2:
-#             attach_back(workflow, PythonCommand(
-#                 stat_peaks,
-#                 input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.encodePeak" for target in conf.treatment_targets ],
-#                                    "5M_spot": [ target + "_5M_macs2_peaks.encodePeak" for target in conf.treatment_targets ],
-#                                    "combo": conf.prefix + "_peaks.encodePeak"}},
-#                 output = {"json": conf.json_prefix + "_peaks.json"},
-#                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
-#         else:
-#             attach_back(workflow, PythonCommand(
-#                 stat_peaks,
-#                 input = {"peaks": {"all_peaks": [ target + "_macs2_all_peaks.encodePeak" for target in conf.treatment_targets ],
-#                                    "5M_spot": [ target + "_5M_macs2_peaks.encodePeak" for target in conf.treatment_targets ]}},
-#                 output = {"json": conf.json_prefix + "_peaks.json"},
-#                 param = {"tool": conf.peakcalltool, "samples": conf.treatment_bases}))
-
-#     ## peaks number latex
-#     attach_back(workflow, PythonCommand(
-#         peaks_doc,
-#         input = {"tex": tex, "json": conf.json_prefix + "_peaks.json"},
-#         output = {"latex": conf.latex_prefix + "_peaks.tex"},
-#         param = {"reps": len(conf.treatment_pairs), "samples": conf.treatment_bases},
-#         name = "peaks number json"))
-
-#     if conf.peakcalltool == "hotspot":
-#         spot = [ target + "_5M_sort.spot.out" for target in conf.treatment_targets ]
-#     elif conf.peakcalltool == "macs2":
-#         spot = [ target + "_5M_macs2_peaks.encodePeak" + ".spot.out" for target in conf.treatment_targets ]
-
-#     ## 5M reads, calculate the merged two passes and peaks regions number
-#     ## 5M reads for macs2 optionally
-#     attach_back(workflow, PythonCommand(
-#         stat_spot_on_replicates,
-#         input = {"spot_files": spot},
-#         output = {"json": conf.json_prefix + "_sample_spot_5M.json"},
-#         name = "json spot",
-#         param = {"samples": conf.treatment_bases}))
-
-#     attach_back(workflow, PythonCommand(
-#         spot_doc,
-#         input = {"json": conf.json_prefix + "_sample_spot_5M.json",
-#                  "tex": tex},
-#         output = {"latex": conf.latex_prefix + "_spot.tex"},
-#         name = "doc spot 5M",
-#         param = {"samples": conf.treatment_bases, "reps": len(conf.treatment_pairs)}))

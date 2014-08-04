@@ -20,14 +20,15 @@ def filter_bam(workflow, conf, tex):
             name = "pair"
             tool = "dac_bam_pe_post_filter"
             param = {"mapq": 3, "namesortedbamprefix": target + "_name_sorted",
-                     "finalprefix": target + "_final"}
+                     "finalprefix": target + "_final",
+                     "qc2": target + "_filter_bam_stats.qc"}
             output = {"finalbam": target + "_final.bam",
                       "namesortedbam": target + "_name_sorted.bam",
                       "bamwithoutchrm": target + "_final_nochrm.bam",
                       "qc": target + "_filter_bam.qc"}
 
             attach_back(workflow, ShellCommand(
-                "{tool} {input[raw]} {param[namesortedbamprefix]} {output[namesortedbam]} {param[finalprefix]} {output[finalbam]} {param[mapq]} {output[bamwithoutchrm]} {output[qc]}",
+                "{tool} {input[raw]} {param[namesortedbamprefix]} {output[namesortedbam]} {param[finalprefix]} {output[finalbam]} {param[mapq]} {output[bamwithoutchrm]} {output[qc]} {param[qc2]}",
                 tool=tool,
                 input=input,
                 output=output,
@@ -36,13 +37,15 @@ def filter_bam(workflow, conf, tex):
         else:
             name = "single"
             tool = "dac_bam_se_post_filter"
-            param = {"mapq": 3}
+            param = {"mapq": 3,
+                     "qc2": target + "_filter_bam_stats.qc"}
             output = {"finalbam": target + "_final.bam",
                       "bamwithoutchrm": target + "_final_nochrm.bam",
                       "qc": target + "_filter_bam.qc"}
 
+
             attach_back(workflow, ShellCommand(
-                "{tool} {input[raw]} {output[finalbam]} {param[mapq]} {output[qc]} {output[bamwithoutchrm]}",
+                "{tool} {input[raw]} {output[finalbam]} {param[mapq]} {output[qc]} {output[bamwithoutchrm]} {param[qc2]}",
                 tool=tool,
                 input=input,
                 output=output,

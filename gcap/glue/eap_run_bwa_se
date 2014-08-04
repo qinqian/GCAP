@@ -8,11 +8,16 @@ input=$3
 rawbam=$4
 qc=$5
 prefix=$6
+qc2=$7
+
+if [ ! -s ${rawbam} ]
+then
 
 bwa aln -q 5 -l 32 -k 2 -t $threads $index $input > ${prefix}.sai
 bwa samse $index ${prefix}.sai ${input} | samtools view -Shu - | samtools sort - ${prefix}
 samtools flagstat ${rawbam} >${qc}
+samtools stats ${rawbam} > ${qc2}
 
 rm ${prefix}.sai
 
-
+fi

@@ -41,7 +41,7 @@ def parse_args(args=None):
     parser.add_argument("--resume", dest="resume", action="store_false", default=True)
     parser.add_argument("--pe", dest="pe", action="store_true", default=False)
     parser.add_argument("--threads", dest="threads", default=8, type=int,
-                        help="threads # to use when aligning (default: 4)")
+                        help="threads # to use when aligning using bwa (default: 4)")
     parser.add_argument("-i", "--input", dest = "input", required=True,
                         help = "DNase-seq data, comma(,) separate replicates, format(fastq) fixed by extension")
 
@@ -131,8 +131,10 @@ def create_workflow(args, conf, tex):
 
     if need_run(5):
         bld.build(call_peaks)
+
     # if need_run(6):
     #     bld.build(pool) ## pool peak calling and dhs overlap
+
     # if need_run(6): # optionally
     #     bld.build(fragment_size)
     return workflow

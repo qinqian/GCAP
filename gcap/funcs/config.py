@@ -117,26 +117,12 @@ class Conf(object):
         return os.path.join(self.category("latex"), self.id)
 
     @property
-    def hotspot_merge_final_prefix(self):
-        return os.path.join(self.prefix + "_merge_all-final", self.id)
+    def hotspot_reps_prefix(self): ## for final peaks
+        return [ os.path.join(f + "_hotspot", self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
 
     @property
-    def hotspot_reps_final_prefix(self):
-        return [ os.path.join(f + "-final", self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
-
-    @property
-    def hotspot_reps_final_5M_prefix(self):
-        return [ os.path.join(f + "_5M_sort-final", self.id + "_treat_rep" + str(i+1) + "_5M_sort") for i, f in enumerate(self.treatment_targets) ]
-
-    @property
-    def hotspot_starch_input(self):
-        """ bed.starch should have a different directory from output """
-        return [ os.path.join(self.category("hotspot_starch_input"), self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
-
-    @property
-    def hotspot_merge_starch(self):
-        """ bed.starch should have a different directory from output """
-        return os.path.join(self.category("hotspot_starch_input"), self.id)
+    def hotspot_reps_tmp_prefix(self): ## for spot score
+        return [ os.path.join(f + "_hotspot_tmp", self.id + "_treat_rep" + str(i+1)) for i, f in enumerate(self.treatment_targets) ]
 
     @property
     def treatment_pairs(self):

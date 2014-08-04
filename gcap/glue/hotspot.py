@@ -16,7 +16,7 @@ def main():
     parser.add_argument('tmpDir', help='Path to a temporary directory that will be created by this tool and cleaned up afterwards')
     parser.add_argument('outputDir', help='Path to a directory to which the output files will be copied')
     parser.add_argument('-s', '--seed', type=int, default=101)
-    parser.add_argument('-o', '--onlyspot', type=int, default=False)
+    parser.add_argument('-o', '--onlyspot', action="store_false", default=True)
     parser.add_argument('-i', '--inputControl', default=None, help='Bam file, For ChIP-seq runs, an input will be required')
     parser.add_argument('-c', '--checkChr', default=None, help='Tests a portion of the given chromosome (e.g. chrX)')
 
@@ -81,6 +81,11 @@ def main():
     runName = os.path.splitext(fileName)[0]
     
     # mapping from files hotspot creates to what we want to name them as
+    #     Use hotspot v4, output list:
+    # 	*-final/*.hot.bed               minimally thresholded hotspots( corresponding to hotspot v3 b, broad Peak)
+    # 	*-final/*.fdr0.01.hot.bed       FDR thresholded hotspots  ( corresponding to hotspot v3 c)
+    # 	*-final/*.fdr0.01.pks.bed       FDR thresholded peaks     ( corresponding to hotspot v3 d, narrow Peak)
+    # 	tag.density.starch              in target directory, 20bp resolution, converted to bigwiggle
     outputs = {
         args.tmpDir + runName + '-peaks/' + runName + '.tagdensity.bed.starch': args.outputDir + 'density.bed.starch',
         args.tmpDir + runName + '-final/' + runName + '.hot.bed': args.outputDir + 'broadPeaks.bed',
@@ -163,36 +168,41 @@ def main():
         runhotspot.write('    $pipeDir/run_pass2_hotspot\n')
         runhotspot.write('    $pipeDir/run_rescore_hotspot_passes\n')
 
-        runhotspot.write('    $pipeDir/run_spot\n')
-        if not args.onlyspot: ## only computing SPOT score, do not call narrowpeak
+        if not args.onlyspot:
+            runhotspot.write('    $pipeDir/run_spot"\n')
+        else:
+            runhotspot.write('    $pipeDir/run_spot\n') ## Indeed, no need for all reads peak call
+        if args.onlyspot: ## only computing SPOT score, do not call narrowpeak
             runhotspot.write('    $pipeDir/run_thresh_hot.R\n')
             runhotspot.write('    $pipeDir/run_both-passes_merge_and_thresh_hotspots\n')
             runhotspot.write('    $pipeDir/run_add_peaks_per_hotspot\n')
             runhotspot.write('    $pipeDir/run_final"\n')
-            
+
         runhotspot.write('python2.7 $scriptTokBin --clobber --output-dir=%s $tokenFile $scripts\n' % args.tmpDir)
         runhotspot.write('cd %s\n' % args.tmpDir)
         runhotspot.write('retCode=0\n')
         runhotspot.write('for script in $scripts\n')
         runhotspot.write('do\n')
-        runhotspot.write('    time bash  %s$(basename $script).tok\n' % args.tmpDir)
+        runhotspot.write('    time %s$(basename $script).tok\n' % args.tmpDir)
         runhotspot.write('    retCode=$?\n')
         runhotspot.write('done\n')
         runhotspot.write('exit $retCode\n')
 
     os.chmod(runhotspotName, 0o755) # Make this executable (leading 0 is for octal)
-    
+
     retCode = subprocess.call(runhotspotName)
     if retCode != 0:
+        print(retCode)
         return retCode
     
     if not os.path.isdir(args.outputDir):
         os.makedirs(args.outputDir)
 
     # move out all the files we want to keep
-    for hotfile, outfile in outputs.iteritems():
-        print(" mv %s %s\n" % (hotfile, outfile))
-        os.rename(hotfile, outfile)
+    if args.onlyspot:
+        for hotfile, outfile in outputs.items():
+            print(" cp %s %s\n" % (hotfile, outfile))
+            os.rename(hotfile, outfile)
 
     return 0
         

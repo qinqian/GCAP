@@ -15,13 +15,14 @@ def _bwa(workflow, conf):
     incorpate ENCODE ChIP-seq alignment parameters
     """
     for raw, target in conf.treatment_pairs:
-        param = {"threads": 8,
+        param = {"threads": conf.threads,
                  "index":conf.get(conf.species, "genome_index"),
-                 "prefix": target + "_raw_sorted"}
+                 "prefix": target + "_raw_sorted",
+                 "qc2": target + "_rawbam_stats.qc"}
 
         if conf.pe:
             bwa = attach_back(workflow, ShellCommand(
-                "{tool} {param[threads]} {param[index]} {input[fastq][0]} {input[fastq][1]} {output[bam]} {output[qc]} {param[prefix]}",
+                "{tool} {param[threads]} {param[index]} {input[fastq][0]} {input[fastq][1]} {output[bam]} {output[qc]} {param[prefix]} {param[qc2]}",
                 tool = "eap_run_bwa_pe",
                 input = {"fastq": raw},
                 output = {"bam": target + "_raw_sorted.bam", "qc": target + "_rawbam.qc"},
@@ -29,7 +30,7 @@ def _bwa(workflow, conf):
                 name = "pair end mapping"))
         else:
             bwa = attach_back(workflow, ShellCommand(
-                "{tool} {param[threads]} {param[index]} {input[fastq]} {output[bam]} {output[qc]} {param[prefix]}",
+                "{tool} {param[threads]} {param[index]} {input[fastq]} {output[bam]} {output[qc]} {param[prefix]} {param[qc2]}",
                 tool = "eap_run_bwa_se",
                 input = {"fastq": raw},
                 output = {"bam": target + "_raw_sorted.bam", "qc": target + "_rawbam.qc"},

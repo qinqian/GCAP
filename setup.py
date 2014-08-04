@@ -83,8 +83,10 @@ def main():
                    "gcap/glue/hotspot.py",
                    "gcap/glue/dac_pbc",
                    "gcap/glue/dac_spot",
+                   "gcap/glue/eap_narrowPeak_to_bigBed",
+                   "gcap/glue/eap_broadPeak_to_bigBed",
                   ],
-        package_data = {"gcap" : ["static/*"]},
+        package_data = {"gcap" : ["static/*", "glue/*as"]},
         install_requires=['jinja2','argparse'],
         classifiers=[
             'Development Status :: 4 - Beta',

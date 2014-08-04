@@ -4,32 +4,49 @@
 
 # Check command line and provide usage and version information
 
-if [ $# -ne 9 ];
-then echo "usage v2: eap_run_hotspot hotspot_dir genome input.bam readLength out.narrowPeak out.broadPeak out.bigWig tmp output"
+if [ $# -ne 14 ];
+then echo "usage v2: eap_run_hotspot hotspot_dir genome input.bam readLength out.narrowPeak.bb out.broadPeak.bb out.bigWig tmp output narrowPeak.as broadPeak.as chromsize out.narrowPeak out.broadPeak"
 echo Makes temp files so should be run in a freshly created directory.
 exit -1;
 fi
 
 # Set paths with ones we depend on first and call helper python module to run hotspot.
 toolsDir=${1}
-output=$8
-tmp=$9
-export PATH=${toolsDir}/hotspot-distr/hotspot-deploy/bin/:$PATH
-hotspot.py ${toolsDir}/hotspot-distr/ $3 $2 DNase-seq $4 $tmp $output
 
+tmp=$8
+output=$9
+export PATH=${toolsDir}/hotspot-distr/hotspot-deploy/bin/:${PATH}
+
+if [ ! -d ${output} ]
+then
+   hotspot.py ${toolsDir}/hotspot-distr/ $3 $2 DNase-seq $4 $tmp $output
+fi
+
+if [ ! -s ${13} ]
+then
 # Convert output into ENCODE formats,
 # Convert narrowPeaks.bed and several stray columns to narrowPeaks.bigBed in $4
-paste ${output}/narrowPeaks.bed ${output}/narrowPeaks.dens ${output}/narrowPeaks.pval | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "p" NR, 0, ".", $4, $5, -1, -1}' > ${tmp}/tmp.narrowPeak
-eap_narrowPeak_to_bigBed $2 ${tmp}/tmp.narrowPeak $5
+paste ${output}/narrowPeaks.bed ${output}/narrowPeaks.dens ${output}/narrowPeaks.pval | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "p" NR, 0, ".", $4, $5, -1, -1}' - | sort -k1,1 -k2,2n - > ${tmp}/tmp.narrowPeak
+eap_narrowPeak_to_bigBed ${12} ${10} ${tmp}/tmp.narrowPeak $5
+cp ${tmp}/tmp.narrowPeak ${13}
+wc -l ${tmp}/tmp.narrowPeak > ${13}.qc
+fi
 
+if [ ! -s ${14} ]
+then
 # Convert broadPeaks.bed and broadPeaks.pVal to broadPeaks.bigBed in $5
-paste ${output}/broadPeaks.bed ${out}/broadPeaks.pval | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "hot" NR, 0, ".", $5, $6, -1}' > ${tmp}/tmp.broadPeak
-eap_broadPeak_to_bigBed $2 ${tmp}/tmp.broadPeak $6
+paste ${output}/broadPeaks.bed ${output}/broadPeaks.pval | awk 'BEGIN {OFS="\t"} {print $1, $2, $3, "hot" NR, 0, ".", $5, $6, -1}' - | sort -k1,1 -k2,2n - > ${tmp}/tmp.broadPeak
+eap_broadPeak_to_bigBed ${12} ${11} ${tmp}/tmp.broadPeak $6
+cp ${tmp}/tmp.broadPeak ${14}
+wc -l ${tmp}/tmp.broadPeak > ${14}.qc
+fi
 
+if [ ! -s ${7} ]
+then
 # Convert starched bedGraph to mappable-only bigWig in $6
 unstarch ${output}/density.bed.starch > ${tmp}/tmp.bed
-intersectBed -a ${tmp}/tmp.bed -b "${toolsDir}/hotspot-distr/data/"$2".K"$4".mappable_only.bed" -f 1.00 | cut -f 1,2,3,5 | bedGraphPack stdin tmp.bedGraph
-bedGraphToBigWig ${tmp}/tmp.bedGraph "${toolsDir}/chromInfo_"$2".txt" ${7}
-
+intersectBed -a ${tmp}/tmp.bed -b "${toolsDir}/hotspot-distr/data/"$2".K"$4".mappable_only.bed" -f 1.00 | cut -f 1,2,3,5 | bedGraphPack stdin ${tmp}/tmp.bedGraph
+bedGraphToBigWig ${tmp}/tmp.bedGraph ${13} ${12} ${7}
+fi
 # Clean up big boring temporary files
 rm -r ${tmp}

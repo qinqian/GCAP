@@ -8,15 +8,21 @@ hotspot_dir=$5
 output=$6
 tmp=$7
 Nread2=5000000
+hotspot_spot=$8
 
 if [ ! -s ${bamwithoutchrm}.${Nread2}.bam ]
 then
     edwBamStats -sampleBamSize=${Nread2} -u4mSize=${Nread2} -sampleBam=${bamwithoutchrm}.${Nread2}.bam ${bamwithoutchrm} tmp.ra
 fi
 
-if [ ! -d $output ]
+if [ ! -s ${hotspot_spot} ]
 then
-    eap_run_hotspot $hotspot_dir $genome ${bamwithoutchrm}.${Nread2}.bam $readsize 5M.narrowPeak 5M.broadPeak 5M.bigWig $tmp $output
-    bigBedToBed 5M.broadPeak stdout | cut -f 1-4 > broad.bed
-    bigWigAverageOverBed 5M.bigWig broad.bed /dev/null -stats=${spot}
+    export PATH=${toolsDir}/hotspot-distr/hotspot-deploy/bin/:$PATH
+    hotspot.py -o ${hotspot_dir}/hotspot-distr/ ${bamwithoutchrm}.${Nread2}.bam $genome DNase-seq $readsize $tmp $output
+fi
+
+if [ ! -s ${spot} ]
+then
+    cp ${hotspot_spot} ${spot}
+    rm -r $tmp
 fi
