@@ -7,9 +7,9 @@ mapthresh=$3 ## we prefer 1
 qc=$4
 bamwithoutchrm=$5
 finalprefix=$6
-qc2=$5
+qc2=$7
 
-samtools view -F 1804 -q ${mapthresh} -u ${rawbam} | samtools sort - ${finalprefix}
+samtools view -F 1804 -q ${mapthresh} -u ${rawbam} | samtools sort -m 5000000000 - ${finalprefix}
 samtools flagstat ${finalbam} > ${qc}
 samtools stats ${finalbam} > ${qc2}
 

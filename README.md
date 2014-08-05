@@ -22,7 +22,7 @@ python      | 2.7        | <http://www.python.org/ftp/python/2.7.6/Python-2.7.6.
 bwa         | 0.7.7        | <https://github.com/lh3/bwa> |
 fastqStatsAndSubsample | 2 | 	<https://github.com/ENCODE-DCC/kentUtils> |
 edwBamFilter | 2 | 	<https://github.com/ENCODE-DCC/kentUtils> |
-samtools | 0.1.19 | https://github.com/samtools/samtools |
+samtools | 0.2.0 | https://github.com/samtools/samtools |
 bedops | 2.4.2 | https://github.com/bedops/bedops/releases/download/v2.4.2/bedops_linux_x86_64-v2.4.2.tar.bz2 |
 hotspot | 4 | https://github.com/rthurman/hotspot/archive/4.0.0.tar.gz |
 

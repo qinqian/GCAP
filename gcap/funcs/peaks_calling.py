@@ -66,6 +66,8 @@ def hotspotv4(workflow, conf, tex):
                         output = {"narrowbb": target + ".narrowPeak.bigBed",
                                   "broadbb": target + ".broadPeak.bigBed",
                                   "narrow": target + ".narrowPeak",
+                                  # "qc1": target + ".narrowPeak.qc",
+                                  # "qc2": target + ".broadPeak.qc",
                                   "broad": target + ".broadPeak",
                                   "bigwig": target + ".bigWig",
                                   "hotspot_output": target + "_hotspot"},
@@ -90,6 +92,8 @@ def hotspotv4(workflow, conf, tex):
         hotspot_merge.output ={"narrowbb": conf.prefix + ".narrowPeak.bigBed",
                                "broadbb": conf.prefix + ".broadPeak.bigBed",
                                "narrow": conf.prefix + ".narrowPeak",
+                               # "qc1": conf.prefix + ".narrowPeak.qc",
+                               # "qc2": conf.prefix + ".broadPeak.qc",
                                "broad": conf.prefix + ".broadPeak",
                                "bigwig": conf.prefix + ".bigWig",
                                "hotspot_output": conf.prefix + "_hotspot"}

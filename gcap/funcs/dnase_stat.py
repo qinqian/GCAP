@@ -20,12 +20,13 @@ def sample_bam_stat(workflow, conf, tex):
                      "run_spp": conf.get("tool", "spp")}))
 
         attach_back(workflow, ShellCommand(
-            "{tool} {input[bamwithoutchrm]} {param[genome]} {param[readsize]} {output[spot]} {param[hotspot_dir]} {param[hotspot_output]} {param[hotspot_tmp]} {output[spot_tmp]}",
+            "{tool} {input[bamwithoutchrm]} {param[genome]} {param[readsize]} {output[spot]} {param[hotspot_dir]} {param[hotspot_output]} {param[hotspot_tmp]} {param[spot_tmp]}",
             tool = "dac_spot", ## 5M
             input = {"bamwithoutchrm": target + "_final_nochrm.bam"},
-            output = {"spot": target + "_spot_nochrm_5M.qc",
-                      "spot_tmp": conf.hotspot_reps_tmp_prefix[i] + "_final_nochrm.bam.5000000.spot.out"},
+            output = {"spot": target + "_spot_nochrm_5M.qc"},
+
             param = {"genome": conf.species,
+                     "spot_tmp": conf.hotspot_reps_tmp_prefix[i] + "_final_nochrm.bam.5000000.spot.out",
                      "readsize": conf.readsize,
                      "hotspot_dir": conf.get("tool", "peak_calling"),
                      "hotspot_output": target + "_hotspot",

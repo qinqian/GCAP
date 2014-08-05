@@ -38,6 +38,7 @@ def filter_bam(workflow, conf, tex):
             name = "single"
             tool = "dac_bam_se_post_filter"
             param = {"mapq": 3,
+                     "finalprefix": target + "_final",
                      "qc2": target + "_filter_bam_stats.qc"}
             output = {"finalbam": target + "_final.bam",
                       "bamwithoutchrm": target + "_final_nochrm.bam",
@@ -45,7 +46,7 @@ def filter_bam(workflow, conf, tex):
 
 
             attach_back(workflow, ShellCommand(
-                "{tool} {input[raw]} {output[finalbam]} {param[mapq]} {output[qc]} {output[bamwithoutchrm]} {param[qc2]}",
+                "{tool} {input[raw]} {output[finalbam]} {param[mapq]} {output[qc]} {output[bamwithoutchrm]} {param[finalprefix]} {param[qc2]}",
                 tool=tool,
                 input=input,
                 output=output,

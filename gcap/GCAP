@@ -6,7 +6,7 @@ import argparse
 
 ## config file parser
 from samflow.workflow import Workflow, attach_back
-from samflow.command import ShellCommand
+from samflow.command import ShellCommand, PythonCommand
 
 from gcap.funcs.config import Conf
 from gcap.funcs.sequence_quality import read_quality
@@ -14,6 +14,8 @@ from gcap.funcs.mapping import read_mapping
 from gcap.funcs.filter import filter_bam
 from gcap.funcs.dnase_stat import sample_bam_stat
 from gcap.funcs.peaks_calling import call_peaks
+from gcap.funcs.json_collection import json_collect
+import os
 
 # from gcap.funcs.fragment import fragment_size
 # from gcap.funcs.union_dhs_overlap import union_DHS_overlap
@@ -132,11 +134,14 @@ def create_workflow(args, conf, tex):
     if need_run(5):
         bld.build(call_peaks)
 
-    # if need_run(6):
-    #     bld.build(pool) ## pool peak calling and dhs overlap
+    if need_run(6):
 
-    # if need_run(6): # optionally
-    #     bld.build(fragment_size)
+        bld.attach_back(PythonCommand(
+            json_collect,
+            input = {"dir": conf.target_dir},
+            output = {"json":conf.json_prefix + "_qc_summary.json"},
+            param = conf))
+
     return workflow
 
 def main(args=None):

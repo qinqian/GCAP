@@ -17,7 +17,7 @@ tmp=$8
 output=$9
 export PATH=${toolsDir}/hotspot-distr/hotspot-deploy/bin/:${PATH}
 
-if [ ! -d ${output} ]
+if [ ! -s ${output}/narrowPeaks.bed ]
 then
    hotspot.py ${toolsDir}/hotspot-distr/ $3 $2 DNase-seq $4 $tmp $output
 fi
@@ -46,7 +46,7 @@ then
 # Convert starched bedGraph to mappable-only bigWig in $6
 unstarch ${output}/density.bed.starch > ${tmp}/tmp.bed
 intersectBed -a ${tmp}/tmp.bed -b "${toolsDir}/hotspot-distr/data/"$2".K"$4".mappable_only.bed" -f 1.00 | cut -f 1,2,3,5 | bedGraphPack stdin ${tmp}/tmp.bedGraph
-bedGraphToBigWig ${tmp}/tmp.bedGraph ${13} ${12} ${7}
+bedGraphToBigWig ${tmp}/tmp.bedGraph ${12} ${7}
 fi
 # Clean up big boring temporary files
-rm -r ${tmp}
+# rm -r ${tmp}

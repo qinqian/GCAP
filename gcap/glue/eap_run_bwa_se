@@ -14,9 +14,14 @@ if [ ! -s ${rawbam} ]
 then
 
 bwa aln -q 5 -l 32 -k 2 -t $threads $index $input > ${prefix}.sai
-bwa samse $index ${prefix}.sai ${input} | samtools view -Shu - | samtools sort - ${prefix}
+bwa samse $index ${prefix}.sai ${input} | samtools view -Shu - | samtools sort -m 5000000000 - ${prefix}
 samtools flagstat ${rawbam} >${qc}
-samtools stats ${rawbam} > ${qc2}
+#samtools stats ${rawbam} > ${qc2}
+
+## long read support ?
+# bwa mem -t6 long read.1.fq read.2.fq \
+#     | samtools view -@6 -Sub - \
+#     | tee >(samtools flagstat - > stats.out) > aln.bam
 
 rm ${prefix}.sai
 

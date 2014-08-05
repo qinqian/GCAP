@@ -22,7 +22,7 @@ qc2=$9
 # ENCODE ChIP-seq filter standard
 
 samtools view -F 1804 -f 2 -q ${mapthresh} -u ${rawbam} | samtools sort -n - ${namesortedbamprefix}_tmp
-samtools fixmate -r ${namesortedbamprefix}_tmp.bam - | samtools view -F 1804 -f 2 -u - | samtools sort - ${finalprefix}
+samtools fixmate -O bam -r ${namesortedbamprefix}_tmp.bam - | samtools view -F 1804 -f 2 -u - | samtools sort -m 5000000000  - ${finalprefix}
 samtools flagstat ${finalbam} > ${qc}  ## peaks calling use ${finalbam}
 samtools stats ${finalbam} > ${qc2}  ## peaks calling use ${finalbam}
 
