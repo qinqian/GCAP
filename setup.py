@@ -39,7 +39,7 @@ def generate_defaults():
 
     cf = SafeConfigParser()
     cf.add_section('basics')
-    ls = ['id', 'time', 'species', 'input', 'output', 'threads']
+    ls = ['id', 'time', 'species', 'input', 'output']
     for fld in ls:
         cf.set('basics', fld, '$'+fld.upper())
     #SET the chilin version number

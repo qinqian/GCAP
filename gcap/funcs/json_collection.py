@@ -7,6 +7,16 @@ def json_collect(input, output = {}, param = {}):
     have_treat_reps = len(conf.treatment_pairs) >= 2 ## replicates
 
     for target,sample in zip(conf.treatment_targets, conf.treatment_bases):
+        collection["stat"][sample] = {}
+
+        if conf.pe:
+            readquality1 = float(open(target + "pair1_read_quality.qc").readlines()[8].split()[1])
+            readquality2 = float(open(target + "pair2_read_quality.qc").readlines()[8].split()[1])
+            collection["stat"][sample]['ReadQuality'] = [readquality1, readquality2] ## pair 1,  pair 2
+        else:
+            readquality = float(open(target + "_read_quality.qc").readlines()[8].split()[1])
+            collection["stat"][sample]['ReadQuality'] = [readquality] ## read
+
         raw = target + "_rawbam.qc"
         raw = open(raw).readlines()[0].split()[0]
 
@@ -28,7 +38,6 @@ def json_collect(input, output = {}, param = {}):
         pbc = target + "_final_nochrm_15M_pbc.qc" ## no chrM, library complexity
         pbc = open(pbc).read().strip().split()
 
-        collection["stat"][sample] = {}
         collection["stat"][sample]["totalreads"] = int(raw)
         collection["stat"][sample]["mapped"] = int(filter_bam)
 
@@ -58,7 +67,7 @@ def json_collect(input, output = {}, param = {}):
     #             json_dict["stat"][s + "_pair2"]['quality'] = round(float(data[8].strip().split()[1]), 1)
     #             json_dict["stat"][s + "_pair2"]['std'] = data[9].strip().split()[1]
     #             json_dict["stat"][s + "_pair2"]['len'] = data[4].strip().split()[1]
-
+    collection['stat']['SeqType'] = "Pair End"if conf.pe else "Single End"
     if have_treat_reps:
         narrowpeak = conf.prefix + ".narrowPeak.qc"
         broadpeak = conf.prefix + ".broadPeak.qc"
@@ -66,9 +75,9 @@ def json_collect(input, output = {}, param = {}):
         overlap = conf.prefix + "_overlap.qc"
         collection['stat']['correlation_between_replicates'] = float(open(cor, 'rU').read().strip())
         collection['stat']['overlap_divided_by_union_bases'] = float(open(overlap, 'rU').readlines()[-1].strip().split()[1])
-
         collection['stat']['mergedNarrowPeak'] = int(open(narrowpeak, 'rU').read().split()[0])
         collection['stat']['mergedBroadPeak'] = int(open(broadpeak, 'rU').read().split()[0])
+
     json_dump(collection)
 
 
