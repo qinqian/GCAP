@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ $# -lt 2 ];then
+    echo "Need 2 parameters! <bedgraph> <chrom info>"
+    exit
+fi
+
+
+F=$1
+G=$2
+
+bedClip ${F} ${G} ${F}.clip
+
+bedGraphToBigWig ${F}.clip ${G} ${F/bdg/bigWig}
+
+rm -f ${F}.clip
+
