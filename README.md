@@ -27,6 +27,7 @@ edwBamStats | 2 | 	<https://github.com/ENCODE-DCC/kentUtils> |
 samtools | 0.2.0 | https://github.com/samtools/samtools |
 bedops | 2.4.2 | https://github.com/bedops/bedops/releases/download/v2.4.2/bedops_linux_x86_64-v2.4.2.tar.bz2 |
 hotspot | 4 | https://github.com/rthurman/hotspot/archive/4.0.0.tar.gz |
+macs | 2 | macs2 2.0.10.20120913 |
 bedtools |  2.17.0 | http://github.com/arq5x/bedtools/archive/v2.17.0.tar.gz |
 
 Install `setuptools` before install GCAP. To avoid python version conflicts, users are recommended to use [virtualenv](https://raw.githubusercontent.com/pypa/virtualenv/1.9.X/virtualenv.py).

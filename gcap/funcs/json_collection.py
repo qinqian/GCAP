@@ -30,7 +30,7 @@ def json_collect(input, output = {}, param = {}):
         bamstats = open(bamstats).readlines()[28].strip().split()[-1]
 
         narrowpeak = target + ".narrowPeak.qc"
-        broadpeak = target + ".broadPeak.qc"  ## peak number, total filtered uniquely mapped reads with redundancy
+        # broadpeak = target + ".broadPeak.qc"  ## peak number, total filtered uniquely mapped reads with redundancy
 
         phantom = target + "_spp.qc"
         phantom = open(phantom).read().strip().split()  ## NSC, 15M without chrM
@@ -47,7 +47,7 @@ def json_collect(input, output = {}, param = {}):
         # collection["stat"][sample]["RSC"] = float(phantom[8])
         collection["stat"][sample]["NSC"] = float(phantom[9])
         collection['stat'][sample]["narrowPeaknum"] = int(open(narrowpeak, 'rU').read().split()[0])
-        collection['stat'][sample]["broadPeaknum"] = int(open(broadpeak, 'rU').read().split()[0])
+        # collection['stat'][sample]["broadPeaknum"] = int(open(broadpeak, 'rU').read().split()[0])
         spot = target + "_spot_nochrm_5M.qc"
         collection['stat'][sample]["spot"] = float(open(spot, 'rU').readlines()[1].split()[-1])
     #    for i, s in zip(input['seq'], param['samples']):
@@ -70,13 +70,13 @@ def json_collect(input, output = {}, param = {}):
     collection['stat']['SeqType'] = "Pair End"if conf.pe else "Single End"
     if have_treat_reps:
         narrowpeak = conf.prefix + ".narrowPeak.qc"
-        broadpeak = conf.prefix + ".broadPeak.qc"
+        # broadpeak = conf.prefix + ".broadPeak.qc"
         cor = conf.prefix + "_cor.qc"
         overlap = conf.prefix + "_overlap.qc"
         collection['stat']['correlation_between_replicates'] = float(open(cor, 'rU').read().strip())
         collection['stat']['overlap_divided_by_union_bases'] = float(open(overlap, 'rU').readlines()[-1].strip().split()[1])
         collection['stat']['mergedNarrowPeak'] = int(open(narrowpeak, 'rU').read().split()[0])
-        collection['stat']['mergedBroadPeak'] = int(open(broadpeak, 'rU').read().split()[0])
+        # collection['stat']['mergedBroadPeak'] = int(open(broadpeak, 'rU').read().split()[0])
 
     json_dump(collection)
 

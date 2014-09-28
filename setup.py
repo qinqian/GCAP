@@ -10,7 +10,7 @@ GCAP is easy to start
 
 .. code:: python
 
-    GCAP run -c config
+   GCAP -i "test_pair2.fastq,test_pair1.fastq;test_pair2.fastq,test_pair1.fastq" -n test -o test -s hg19 --pe --threads 18 
 
 
 We suggest using virtualenv to avoid python version library conflicts.
@@ -19,8 +19,6 @@ Links
 `````
 
 * `website <https://github.com/qinqian/GCAP>`_
-* `documentation <http://pythonhosted.org/GCAP/>`_
-
 
 """
 
@@ -66,7 +64,7 @@ def main():
         version=version,
         packages=['gcap', "gcap.funcs", "samflow"],
         url='https://github.com/qinqian/GCAP',
-        license='',
+        license='GNU',
         author='Qian Qin',
         author_email='qianqind@gmail.com',
         description='DNase I seq QC pipeline',
@@ -82,7 +80,9 @@ def main():
                    "gcap/glue/eap_run_hotspot",
                    "gcap/glue/hotspot.py",
                    "gcap/glue/dac_pbc",
+                   "gcap/glue/bdg2bw",
                    "gcap/glue/dac_spot",
+                   "gcap/glue/dac_macs2_spot.sh",
                    "gcap/glue/eap_narrowPeak_to_bigBed",
                    "gcap/glue/eap_broadPeak_to_bigBed",
                   ],

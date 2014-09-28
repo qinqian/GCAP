@@ -8,7 +8,7 @@
 
 if [ $# -lt 2 ];then
     echo `basename $0` "calculate MACS2 SPOT score"
-    echo "Need 1 parameters now: <tags bed starch file> <peaks bed file>"
+    echo "Need 1 parameters now: <tags bam/bed file> <peaks bed file> <out>"
     exit 1
 fi
 
@@ -51,7 +51,7 @@ fi
 
 ntag=`wc -l ${proj}_tags.bed | cut -d" " -f1`
 
-out=${peaks}.spot.out
+out=$3
 
 tih=$(cat ${proj}_tags.bed | bedops -e -1 - $peaks | wc -l)
 

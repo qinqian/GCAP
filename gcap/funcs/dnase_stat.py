@@ -19,15 +19,17 @@ def sample_bam_stat(workflow, conf, tex):
             param = {"pe": "pe" if conf.pe else "se",
                      "run_spp": conf.get("tool", "spp")}))
 
-        attach_back(workflow, ShellCommand(
-            "{tool} {input[bamwithoutchrm]} {param[genome]} {param[readsize]} {output[spot]} {param[hotspot_dir]} {param[hotspot_output]} {param[hotspot_tmp]} {param[spot_tmp]}",
-            tool = "dac_spot", ## 5M
-            input = {"bamwithoutchrm": target + "_final_nochrm.bam"},
-            output = {"spot": target + "_spot_nochrm_5M.qc"},
+        if not "macs" in conf.get("tool", "peak_calling"):
 
-            param = {"genome": conf.species,
-                     "spot_tmp": conf.hotspot_reps_tmp_prefix[i] + "_final_nochrm.bam.5000000.spot.out",
-                     "readsize": conf.readsize,
-                     "hotspot_dir": conf.get("tool", "peak_calling"),
-                     "hotspot_output": target + "_hotspot",
-                     "hotspot_tmp": target + "_hotspot_tmp"}))
+            attach_back(workflow, ShellCommand(
+                "{tool} {input[bamwithoutchrm]} {param[genome]} {param[readsize]} {output[spot]} {param[hotspot_dir]} {param[hotspot_output]} {param[hotspot_tmp]} {param[spot_tmp]}",
+                tool = "dac_spot", ## 5M
+                input = {"bamwithoutchrm": target + "_final_nochrm.bam"},
+                output = {"spot": target + "_spot_nochrm_5M.qc"},
+
+                param = {"genome": conf.species,
+                         "spot_tmp": conf.hotspot_reps_tmp_prefix[i] + "_final_nochrm.bam.5000000.spot.out",
+                         "readsize": conf.readsize,
+                         "hotspot_dir": conf.get("tool", "peak_calling"),
+                         "hotspot_output": target + "_hotspot",
+                         "hotspot_tmp": target + "_hotspot_tmp"}))
